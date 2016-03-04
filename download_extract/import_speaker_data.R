@@ -61,7 +61,7 @@ parseFile <- function(file_path) {
                            file_path)
 
     # Parse the indicated file using a Perl script
-    system(paste("streetevents/download_extract/import_speaker_data.pl",
+    system(paste("download_extract/import_speaker_data.pl",
                  full_path),
            intern = TRUE)
 }

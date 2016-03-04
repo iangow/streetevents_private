@@ -38,7 +38,7 @@ parseFile <- function(file_path) {
     full_path <- file.path(Sys.getenv("EDGAR_DIR"), "streetevents_project",
                            file_path)
     # Parse the indicate file using a Perl script
-    cmd <- paste("streetevents/download_extract/parse_xml_files.pl", full_path)
+    cmd <- paste("download_extract/parse_xml_files.pl", full_path)
     # cat(cmd)
     system(cmd, intern = TRUE)
 }
