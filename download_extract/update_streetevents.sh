@@ -4,6 +4,6 @@ rsync -avz researchgrid.hbs.edu:/export/projects/streetevents_project/ \
     --exclude=*.7z --exclude=*.sas7bdat \
     --exclude=*.xls* --exclude=jsheridan/*
 
-download_extract/create_call_files.R
-download_extract/import_call_meta_data.R
-download_extract/import_speaker_data.R
+R CMD BATCH --no-environ download_extract/create_call_files.R
+R CMD BATCH --no-environ download_extract/import_call_meta_data.R
+R CMD BATCH --no-environ download_extract/import_speaker_data.R
