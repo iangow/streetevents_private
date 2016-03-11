@@ -43,7 +43,7 @@ rs <- dbDisconnect(pg)
 
 addQAPairs <- function(file_name) {
     library("RPostgreSQL")
-    sql <- paste(readLines("streetevents/qa_pairs/create_qa_pairs.sql"), collapse="\n")
+    sql <- paste(readLines("qa_pairs/create_qa_pairs.sql"), collapse="\n")
 
     pg <- dbConnect(PostgreSQL())
     dbGetQuery(pg, sprintf(sql, file_name, file_name))
