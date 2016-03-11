@@ -3,6 +3,8 @@
 
 # Note that this assumes that streetevents.calls is up to date.
 library("RPostgreSQL")
+print(Sys.getenv("PGHOST"))
+
 pg <- dbConnect(PostgreSQL())
 
 if (!dbExistsTable(pg, c("streetevents", "calls"))) {
@@ -27,7 +29,7 @@ if (!dbExistsTable(pg, c("streetevents", "calls"))) {
 file_list <- dbGetQuery(pg, "
     SET work_mem='2GB';
 
-    SELECT *
+    SELECT DISTINCT *
     FROM streetevents.call_files
     WHERE file_name NOT IN (SELECT file_name FROM streetevents.calls)")
 
@@ -58,3 +60,14 @@ sql <- paste0("COMMENT ON TABLE streetevents.calls IS '",
               "Last update on ", last_update , "'")
 rs <- dbGetQuery(pg, sql)
 dbDisconnect(pg)
+
+# Add comment to reflect last update ----
+library(RPostgreSQL)
+pg <- dbConnect(PostgreSQL())
+last_update <- dbGetQuery(pg,
+                          "SELECT max(last_update)::text FROM streetevents.calls")
+sql <- paste0("COMMENT ON TABLE streetevents.call_files IS '",
+              "Last update on ", last_update , "'")
+rs <- dbGetQuery(pg, sql)
+dbDisconnect(pg)
+
