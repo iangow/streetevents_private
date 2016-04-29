@@ -2,16 +2,7 @@ library("RPostgreSQL")
 
 pg <- dbConnect(PostgreSQL())
 
-# dbSendQuery(pg, "CREATE LANGUAGE plpythonu")
-rs <- dbSendQuery(pg, "
-    CREATE OR REPLACE FUNCTION array_min(an_array integer[])
-        RETURNS integer AS
-    $BODY$
-        if an_array is None:
-            return None
-        return min(an_array)
-    $BODY$ LANGUAGE plpythonu")
-
+# If table doesn't exist, create it.
 if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
     dbGetQuery(pg, "
         DROP TABLE IF EXISTS streetevents.qa_pairs;
@@ -29,6 +20,7 @@ if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
         GRANT SELECT ON streetevents.qa_pairs TO personality_access;")
 }
 
+# Get a list of files on StreetEvents, but not on qa_pairs table.
 file_list <- dbGetQuery(pg, "
     SET work_mem='3GB';
 
@@ -41,6 +33,7 @@ file_list <- dbGetQuery(pg, "
 
 rs <- dbDisconnect(pg)
 
+# A function that calls the parameterized query to process each file
 addQAPairs <- function(file_name) {
     library("RPostgreSQL")
     sql <- paste(readLines("qa_pairs/create_qa_pairs.sql"), collapse="\n")
@@ -50,6 +43,7 @@ addQAPairs <- function(file_name) {
     dbDisconnect(pg)
 }
 
+# Code that applies addQAPairs to function in parallel.
 library(parallel)
 system.time(res <- unlist(mclapply(file_list$file_name, addQAPairs, mc.cores=8)))
 
