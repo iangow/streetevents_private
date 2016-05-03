@@ -3,14 +3,15 @@
 # Code to generate a list of files in the StreetEvents directory
 # and post to PostgreSQL.
 
-library("parallel")
+# Set up stuff ----
+library(parallel)
 library(dplyr)
 getSHA1 <- function(file_name) {
     library("digest")
     digest(file=file_name, algo="sha1")
 }
 
-# Get a list of files
+# Get a list of files ----
 streetevent.dir <- file.path(Sys.getenv("EDGAR_DIR"), "streetevents_project")
 full_path <- list.files(streetevent.dir,
                    pattern="*_T.xml", recursive = TRUE,
@@ -56,28 +57,26 @@ if (!new_table) {
     new_files <- file.list
 }
 
+# Process files ----
 if (dim(new_files)[1]>0) {
     file_info <-
-        as_data_frame(file.info(new_files$full_path)) %>%
+        file.info(new_files$full_path ) %>%
+        as_data_frame() %>%
         transmute(file_size = size,
-                  ctime = as.character(as.POSIXlt(file_info$ctime, tz="UTC")))
-
-    new_files <- bind_cols(new_files, file_info)
+                  ctime = as.character(as.POSIXlt(ctime, tz="UTC")))
 
     new_files <-
-        new_files %>%
-        mutate(file_name = gsub("\\.xml", "", basename(file_path)))
-
-    new_files <-
-        new_files %>%
+        bind_cols(new_files, file_info) %>%
+        mutate(file_name = gsub("\\.xml", "", basename(file_path))) %>%
         rowwise() %>%
         mutate(sha1 = getSHA1(full_path)) %>%
-        select(file_path, file_size, mtime, ctime, file_name, sha1)
+        select(file_path, file_size, mtime, ctime, file_name, sha1) %>%
+        as.data.frame()
 
     if (!new_table) {
         pg <- dbConnect(PostgreSQL())
         rs <- dbWriteTable(pg, c("streetevents", "call_files_new"),
-                           new_files %>% as.data.frame(),
+                           new_files,
                            append=FALSE, row.names=FALSE)
         dbGetQuery(pg, "
             ALTER TABLE streetevents.call_files_new
@@ -103,7 +102,20 @@ if (dim(new_files)[1]>0) {
         rs <- dbWriteTable(pg, c("streetevents", "call_files"), new_files,
                            append=FALSE, row.names=FALSE)
         dbGetQuery(pg, "
-            CREATE INDEX ON streetevents.call_files (file_name, mtime)")
+            ALTER TABLE streetevents.call_files
+            ALTER mtime TYPE timestamp with time zone
+            USING mtime::timestamp without time zone AT TIME ZONE 'UTC'")
+
+        dbGetQuery(pg, "
+            ALTER TABLE streetevents.call_files
+            ALTER ctime TYPE timestamp with time zone
+            USING ctime::timestamp without time zone AT TIME ZONE 'UTC'")
+
+        dbGetQuery(pg, "
+            CREATE INDEX ON streetevents.call_files (file_name)")
+
+        dbGetQuery(pg, "
+            CREATE INDEX ON streetevents.call_files (file_path)")
         rs <- dbDisconnect(pg)
     }
 }
