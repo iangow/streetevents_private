@@ -1,4 +1,18 @@
 #!/usr/bin/env Rscript
+
+# Delete files that no longer exist ----
+library(RPostgreSQL)
+pg <- dbConnect(PostgreSQL())
+
+last_update <- dbGetQuery(pg, "
+    DELETE FROM streetevents.calls AS a
+    USING streetevents.calls AS b
+    LEFT JOIN streetevents.call_files AS c
+    USING (file_path)
+    WHERE c.file_path IS NULL AND a.file_path=b.file_path")
+
+rs <- dbDisconnect(pg)
+
 # Get a list of files that need to be processed ----
 
 # Note that this assumes that streetevents.calls is up to date.
@@ -29,9 +43,9 @@ if (!dbExistsTable(pg, c("streetevents", "calls"))) {
 file_list <- dbGetQuery(pg, "
     SET work_mem='2GB';
 
-    SELECT DISTINCT *
+    SELECT DISTINCT file_path
     FROM streetevents.call_files
-    WHERE file_name NOT IN (SELECT file_name FROM streetevents.calls)")
+    WHERE file_path NOT IN (SELECT file_path FROM streetevents.calls)")
 
 rs <- dbDisconnect(pg)
 
