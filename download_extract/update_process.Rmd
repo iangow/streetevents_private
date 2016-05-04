@@ -2,7 +2,9 @@
 title: "StreetEvents updates"
 author: "Ian Gow"
 date: "May 3, 2016"
-output: pdf_document
+output: 
+    pdf_document:
+        fig_caption: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -10,8 +12,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## StreetEvents update
-
-It looks like the files all come from 2015.
 
 ```{r data_step, warning=FALSE, message=FALSE}
 library(dplyr)
@@ -30,32 +30,38 @@ calls %>%
     select(last_update) 
 ```
 
-## Histograph of `call_date`
-
-```{r call_date}
+```{r call_date, message=FALSE, fig.cap="Histogram of `call_date` on `calls`"}
 calls %>%
     filter(file_path ~ 'Apr2016') %>%
+    mutate(call_month=date_trunc('month', call_date)) %>%
+    select(call_month) %>%
     as.data.frame() %>%
-    ggplot(aes(x=call_date)) +
-    geom_histogram(binwidth=24*60*60)
+    ggplot(aes(x=call_month)) +
+    geom_histogram()
 ```
 
-## Histograph of `last_update`
-
-```{r last_update}
+```{r last_update, message=FALSE, fig.cap="Histogram of `last_update` on `calls`"}
 calls %>%
     filter(file_path ~ 'Apr2016') %>%
     as.data.frame() %>%
     ggplot(aes(x=last_update)) +
-    geom_histogram(binwidth=24*60*60)
+    geom_histogram()
 ```
 
-## Histograph of `mtime`
+```{r last_update_speaker, message=FALSE, fig.cap="Histogram of `last_update` on `speaker_data`"}
+speaker_data %>%
+    filter(last_update > '2016-03-31') %>%
+    select(file_name, last_update) %>%
+    distinct() %>%
+    as.data.frame() %>%
+    ggplot(aes(x=last_update)) +
+    geom_histogram()
+```
 
-```{r mtime}
+```{r mtime, message=FALSE, fig.cap="Histogram of `mtime` on `call_files`"}
 call_files %>%
     filter(file_path ~ 'Apr2016') %>%
     as.data.frame() %>%
     ggplot(aes(x=mtime)) +
-    geom_histogram(binwidth=24*60*60)
+    geom_histogram()
 ```
