@@ -35,13 +35,14 @@ REMOVE FOREIGN (EXAMPLES):
 CREATE OR REPLACE FUNCTION streetevents.clean_tickers (ticker text) RETURNS text AS
 $BODY$
   # Remove any asterisks
-  $_[0] =~ s/\*//g;
+  my $string = $_[0];
+  $string =~ s/\*//g;
 
   # Remove trailing .A
-  $_[0] =~ s/\.A$//g;
+  $string =~ s/\.A$//g;
 
-  return $_[0];
-$BODY$ LANGUAGE plperl;
+  return $string;
+$BODY$ LANGUAGE plperl IMMUTABLE STRICT COST 100;
 
 ALTER FUNCTION streetevents.clean_tickers(text) OWNER TO personality_access;
 
@@ -60,12 +61,15 @@ CREATE OR REPLACE FUNCTION streetevents.remove_trailing_q (ticker text)
 RETURNS text AS
 $BODY$
   # Remove trailing Qs
-  $_[0] =~ s/Q$//g;
+  my $string = $_[0];
+  $string =~ s/Q$//g;
 
-  return $_[0];
-$BODY$ LANGUAGE plperl;
+  return $string;
+$BODY$ LANGUAGE plperl IMMUTABLE STRICT COST 100;
 
 ALTER FUNCTION streetevents.remove_trailing_q(text) OWNER TO personality_access;
+
+
 
 DROP TABLE IF EXISTS streetevents.crsp_link;
 
