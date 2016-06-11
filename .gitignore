@@ -1,3 +1,4 @@
 call_meta_data.txt.gz
 .Rproj.user
 *.Rout
+.Rhistory
