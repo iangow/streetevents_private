@@ -35,13 +35,19 @@ rs <- dbGetQuery(pg, "
     OWNER TO personality_access")
 
 dbGetQuery(pg, "
-  DELETE 
-  FROM streetevents.manual_permno_matches   
-  WHERE file_name IN (
-    SELECT file_name
+    DELETE
     FROM streetevents.manual_permno_matches
-    GROUP BY file_name
-    HAVING count(DISTINCT permno)>1) AND comment != 'Fix by Nastia/Vincent in January 2015'")
+    WHERE file_name IN (
+        SELECT file_name
+        FROM streetevents.manual_permno_matches
+        GROUP BY file_name
+        HAVING count(DISTINCT permno)>1)
+            AND comment != 'Fix by Nastia/Vincent in January 2015';
+
+    CREATE INDEX ON streetevents.manual_permno_matches (file_name);
+")
+
+
 
 rs <- dbDisconnect(pg)
 
