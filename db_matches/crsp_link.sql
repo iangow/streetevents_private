@@ -1,8 +1,5 @@
 /*******************************
-LAST UPDATED: January 2, 2015
-OBJECTIVE: Merge streetevents.calls with PERMNOs from crsp.stocknames
-
-WARNING: IGNORE StreetEvents backdates permnos >> crsp_link is dirty liking(!) use xpf_link instead
+OBJECTIVE: Match streetevents.calls with PERMNOs from crsp.stocknames
 *******************************/
 
 DROP TABLE IF EXISTS streetevents.crsp_link;
