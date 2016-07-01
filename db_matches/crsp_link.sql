@@ -1,72 +1,6 @@
 /*******************************
-LAST UPDATED: January 2, 2015
-OBJECTIVE: Merge streetevents.calls with PERMNOs from crsp.stocknames
-
-WARNING: IGNORE StreetEvents backdates permnos >> crsp_link is dirty liking(!) use xpf_link instead
+OBJECTIVE: Match streetevents.calls with PERMNOs from crsp.stocknames
 *******************************/
-
-/* '.' in tickers for streetevents specifies the stock exhange
-(see: http://www.sirca.org.au/2010/12/tick-history-exchange-identifiers/)
-KEEP U.S.:
-    .N  -> NYSE    (2 tickers for bank of cyprus with .N but is not in NYSE, thus incorrectly labelled?)
-    .OQ -> NASDAQ  (0 tickers with .OQ)
-    .A  -> AMEX       (4 tickers with .A -> BRK.A, FCE.A, JW.A, MOG.A)
-REMOVE FOREIGN (EXAMPLES):
-    .TW -> Taiwan
-    .TO -> Toronto
-    .T  -> Tokyo (Nikkei)
-    .L  -> London (FTSE)
---remove foreign firms and obtain unmatched obs.*/
-
-/*Some tickers in streetevents have '**' in front of the ticker. Not certain why.
-
-    Examples:
-        ticker    | co_name         | call_date
-        **ADAM    | ADAM Inc        | 2008-11-06 15:00:00
-        **GEH     | GE Healthcare   | 2005-04-05 08:00:00
-        **DRD     | Duane Reade     | 2006-05-11 14:00:00
-
-   Remove Asterix
-*/
-
---DROP EXTENSION plperl CASCADE;
--- CREATE EXTENSION plperl; --postgresql-plperl not installable
-
-CREATE OR REPLACE FUNCTION streetevents.clean_tickers (ticker text) RETURNS text AS
-$BODY$
-  # Remove any asterisks
-  $_[0] =~ s/\*//g;
-
-  # Remove trailing .A
-  $_[0] =~ s/\.A$//g;
-
-  return $_[0];
-$BODY$ LANGUAGE plperl;
-
-ALTER FUNCTION streetevents.clean_tickers(text) OWNER TO personality_access;
-
-/* Some tickers with ending Q causes non-matches. Examples:
-    streetevents          --->  crsp.stocknames
-    _______________________     _______________________________________
-    ticker  co_name             ticker  comnam
-    ATRNQ   Atrinsic Inc        ATRN    ATRINSIC INC
-    CPICQ   CPI CORP            CPIC    C P I CORP
-    DDMGQ   Digital Domain      DDMG    DIGITAL DOMAIN MEDIA GROUP INC
-            Media Group Inc
-*/
-SET work_mem='15GB';
-
-CREATE OR REPLACE FUNCTION streetevents.remove_trailing_q (ticker text)
-RETURNS text AS
-$BODY$
-  # Remove trailing Qs
-  $_[0] =~ s/Q$//g;
-
-  return $_[0];
-$BODY$ LANGUAGE plperl;
-
-ALTER FUNCTION streetevents.remove_trailing_q(text) OWNER TO personality_access;
-
 DROP TABLE IF EXISTS streetevents.crsp_link;
 
 CREATE TABLE streetevents.crsp_link AS
@@ -110,14 +44,17 @@ match1 AS (
 
     In StreetEvents, SPANSION ticker is only CODE from 2006-2013
 */
+roll_match1 AS (
+    SELECT DISTINCT co_name, ticker, permno
+    FROM match1
+    WHERE permno IS NOT NULL),
 
 match2 AS (
-    SELECT DISTINCT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
+    SELECT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
         '2. Roll matches back & forward in StreetEvents'::text AS match_type_desc
     FROM match1 AS a
-    LEFT JOIN match1 AS b
-    ON a.ticker=b.ticker
-        AND a.co_name=b.co_name AND b.permno IS NOT NULL
+    LEFT JOIN roll_match1 AS b
+    USING (ticker, co_name)
     WHERE a.permno IS NULL),
 
 match3 AS (
@@ -131,13 +68,17 @@ match3 AS (
         AND difference(a.co_name, b.comnam) = 4
     WHERE a.permno IS NULL),
 
+roll_match3 AS (
+    SELECT DISTINCT co_name, ticker, permno
+    FROM match3
+    WHERE permno IS NOT NULL),
+
 match4 AS (
-    SELECT DISTINCT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
+    SELECT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
         '4. Roll matches back & forward on #3'::text AS match_type_desc
     FROM match3 AS a
-    LEFT JOIN match3 as b
-    ON a.ticker = b.ticker
-        AND a.co_name = b.co_name
+    LEFT JOIN roll_match3 as b
+    USING (ticker, co_name)
     WHERE a.permno IS NULL),
 
 match5 AS (
@@ -150,13 +91,17 @@ match5 AS (
         AND DIFFERENCE(a.co_name, b.comnam) = 4
     WHERE a.permno IS NULL),
 
+roll_match5 AS (
+    SELECT DISTINCT co_name, ticker, permno
+    FROM match5
+    WHERE permno IS NOT NULL),
+
 match6 AS (
     SELECT DISTINCT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
         '6. Roll matches back and forward on #5'::text AS match_type_desc
     FROM match5 AS a
-    LEFT JOIN match5 as b
-    ON a.ticker = b.ticker
-        AND a.co_name = b.co_name AND b.permno IS NOT NULL
+    LEFT JOIN roll_match5 as b
+    USING (ticker, co_name)
     WHERE a.permno IS NULL),
 
 match7 AS (
@@ -169,13 +114,17 @@ match7 AS (
         AND difference(a.co_name, b.comnam) >= 2
     WHERE a.permno IS NULL),
 
+roll_match7 AS (
+    SELECT DISTINCT co_name, ticker, permno
+    FROM match7
+    WHERE permno IS NOT NULL),
+
 match8 AS (
-    SELECT DISTINCT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
+    SELECT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
         '8. Roll matches back & forward on #7'::text AS match_type_desc
     FROM match7 AS a
-    LEFT JOIN match7 as b
-    ON a.ticker = b.ticker
-        AND a.co_name = b.co_name AND b.permno IS NOT NULL
+    LEFT JOIN roll_match7 as b
+    USING (ticker, co_name)
     WHERE a.permno IS NULL),
 
 match9 AS (
@@ -188,16 +137,20 @@ match9 AS (
         AND lower(co_name) = lower(comnam)
     WHERE a.permno IS NULL),
 
+roll_match9 AS (
+    SELECT DISTINCT co_name, ticker, permno
+    FROM match9
+    WHERE permno IS NOT NULL),
+
 match10 AS (
-    SELECT DISTINCT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
+    SELECT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
         CASE WHEN b.permno IS NOT NULL
             THEN '10. Roll matches back & forward on #9'
             ELSE '11. No match'
         END AS match_type_desc
     FROM match9 AS a
-    LEFT JOIN match9 as b
-    ON a.ticker = b.ticker
-        AND a.co_name = b.co_name AND b.permno IS NOT NULL
+    LEFT JOIN roll_match9 as b
+    USING (ticker, co_name)
     WHERE a.permno IS NULL),
 
 all_matches AS (
@@ -243,6 +196,7 @@ all_matches AS (
     UNION ALL
     SELECT file_name, ticker, co_name, call_date, permno, match_type_desc
     FROM match10)
+
 SELECT file_name, permno,
     regexp_replace(match_type_desc, '^([0-9]+).*', '\1')::int AS match_type,
     match_type_desc
