@@ -16,8 +16,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r data_step, warning=FALSE, message=FALSE}
 library(dplyr)
 library(ggplot2)
+library(scales)
 
-pg <- src_postgres(host="iangow.me")
+pg <- src_postgres(host="iangow.me", dbname="crsp")
 
 calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
 speaker_data <- tbl(pg, sql("SELECT * FROM streetevents.speaker_data"))
@@ -26,13 +27,12 @@ call_files<- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
 
 ```{r most_recent}
 calls %>%
-    filter(file_path ~ 'Apr2016') %>%
     select(last_update) 
 ```
 
 ```{r call_date, message=FALSE, fig.cap="Histogram of `call_date` on `calls`"}
 calls %>%
-    filter(file_path ~ 'Apr2016') %>%
+    filter(file_path ~ 'Jun2016') %>%
     mutate(call_month=date_trunc('month', call_date)) %>%
     select(call_month) %>%
     as.data.frame() %>%
@@ -42,7 +42,7 @@ calls %>%
 
 ```{r last_update, message=FALSE, fig.cap="Histogram of `last_update` on `calls`"}
 calls %>%
-    filter(file_path ~ 'Apr2016') %>%
+    filter(file_path ~ 'Jun2016') %>%
     as.data.frame() %>%
     ggplot(aes(x=last_update)) +
     geom_histogram()
@@ -50,7 +50,7 @@ calls %>%
 
 ```{r last_update_speaker, message=FALSE, fig.cap="Histogram of `last_update` on `speaker_data`"}
 speaker_data %>%
-    filter(last_update > '2016-03-31') %>%
+    filter(last_update > '2016-05-31') %>%
     select(file_name, last_update) %>%
     distinct() %>%
     as.data.frame() %>%
@@ -60,7 +60,7 @@ speaker_data %>%
 
 ```{r mtime, message=FALSE, fig.cap="Histogram of `mtime` on `call_files`"}
 call_files %>%
-    filter(file_path ~ 'Apr2016') %>%
+    filter(file_path ~ 'Jun2016') %>%
     as.data.frame() %>%
     ggplot(aes(x=mtime)) +
     geom_histogram()
