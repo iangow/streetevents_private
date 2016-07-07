@@ -33,7 +33,7 @@ def syllable_data(text):
     # Get words that have letters in them (this excludes pure punctuation
     # tokens like `,
     words = [w for w in word_tokens if nonPunct.match(w)]
-    words_7 = [word for word in words if len(word)>7]
+    words_7 = [word for word in words if len(word)>=7]
 
 
     sylls = [nsyl(word.lower()) for word in words]
