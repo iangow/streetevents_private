@@ -1,0 +1,119 @@
+---
+title: "Match comparisons"
+date: "July 18, 2016"
+output: 
+  pdf_document 
+---
+
+This document was produced using code in `match_analysis.Rmd`. (To make `.md` version, run `knit("match_analysis.Rmd")` followed by `pandoc('match_analysis.md', format='markdown_github')`))
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Matching StreetEvents to CRSP
+
+Our goal is to match StreetEvents conference calls to PERMNOs on CRSP.
+StreetEvents conferences calls are identified (pretty much) by their `file_name` values.
+
+We have an "automatic" match created by code in `crsp_link.sql` and stored in 
+the database table `streetevents.crsp_link`.
+I put "automatic" in quotes because this code does leverage manual matches in a 
+[Google Sheets document](https://docs.google.com/spreadsheets/d/14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg/).
+
+We also have a table that represents our *current* definitive mapping in `streetevents.company_link`.
+But this table is out of date and we need to update it.
+Unfortunately, the process by which it was created is not well understood.
+
+So the first order of business is to examine differences between
+`streetevents.crsp_link` and `streetevents.company_link`:
+
+- Are the matches in `streetevents.company_link` generally better?
+- Are differences in PERMNO matches to unrelated firms? Or to the same firm (i.e., same `permco`) but different security (i.e., different `permno`).
+    - If the latter, are we getting the "right" `permno` in general in  `streetevents.company_link`?
+- Can we come up with a way of flagging cases that need correction? 
+    - Differences between  `streetevents.company_link` and `streetevents.crsp_link` will often represent bad matches in `streetevents.company_link` that we identified and corrected. 
+How can we identify these? One known issue is the tendency of ThomsonReuters (the provider of StreetEvents) to "backdate" ticker and company names for acquired companies. These can usually be identified by discrepancies between `co_name` and `call_desc`.
+
+```{r load_packages, include=FALSE}
+library(dplyr)
+library(knitr)
+```
+
+```{r data_step, warning=FALSE}
+# Use Sys.setenv(PGUSER = "rudyardrichter", PGPASSWORD = "xxxxxx") if necessary.
+pg <- src_postgres(host = "aaz.chicagobooth.edu", dbname = "postgres")
+
+tbl_pg <- function(table) {
+    tbl(pg, sql(paste0("SELECT * FROM ", table)))
+}
+
+# Run code in streetevents/crsp_link.sql to create
+# streetevents.crsp_link
+crsp_link <- tbl_pg("streetevents.crsp_link")
+company_link <- tbl_pg("streetevents.company_link")
+manual_permno_matches <- tbl_pg("streetevents.manual_permno_matches")
+calls <- tbl_pg("streetevents.calls")
+stocknames <- tbl_pg("crsp.stocknames")
+```
+
+## StreetEvents data
+
+Here's a small snippet of data from the `streetevents.calls`.
+(More detailed information about the calls (what was said, by whom, etc.) is found in 
+`streetevents.speaker_data`.)
+
+```{r calls}
+calls %>% 
+    filter(call_type==1L, !is.na(call_date)) %>% 
+    select(file_name, ticker, co_name, call_desc, call_date) %>% 
+    top_n(10) %>%
+    mutate(call_date=sql("call_date::date")) %>%
+    kable()
+```
+
+# Comparing `streetevents.crsp_link` and `streetevents.company_link`
+
+Let's join these two tables using `file_name` to see how often we get the same 
+`permno` in both tables.
+
+```{r match_compare}
+# How many firms have the same PERMNO as identified with
+# the ticker match?
+match_compare <-
+    crsp_link %>%
+    inner_join(company_link, by="file_name") %>%
+    mutate(same_permno=permno.x==permno.y) %>%
+    compute()
+```
+
+```{r stat, include=FALSE}
+same_stat <-
+    match_compare %>%
+    mutate(same_permno=as.integer(same_permno)) %>%
+    summarize(sum(same_permno*1)/count(same_permno)) %>%
+    collect() %>%
+    .[[1]]
+```
+It seems we get the same match in `r sprintf("%.0f%%", same_stat*100)` of cases.
+
+Here are the raw numbers:
+```{r compare}
+match_compare %>%
+    group_by(same_permno) %>%
+    summarize(count=n()) %>%
+    kable()
+```
+
+To facilitate examination of the cases where the two tables differ, 
+I saved data to CSV, which I then made into a Google Sheets document
+[here](https://docs.google.com/spreadsheets/d/1IN5b-wXDiqDKxyVq3KEfTo3zv90_GlkvPxh5HJCRvvg/).
+
+```{r diffs}
+library(readr)
+match_compare %>%
+    filter(!same_permno) %>%
+    inner_join(calls) %>%
+    as.data.frame() %>%
+    write_csv("permno_match_diffs.csv")
+```
