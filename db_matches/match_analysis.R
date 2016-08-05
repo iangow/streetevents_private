@@ -65,9 +65,6 @@ diff_permco <-
     match_compare_permco_diff_permno %>%
     filter(!same_permco)
 
-match_compare_stocks <-
-    match_compare_permco %>%
-    filter(!same_permno) %>%
-    inner_join(stocknames, by=c("permno.crsp"="permno")) %>%
-    inner_join(stocknames, by=c("permno.comp"="permno"),
-               suffix=c(".crsp1", ".comp1"))
+diff_permco_calls <-
+    match_compare_permco_diff_permno %>%
+    inner_join(calls, by="file_name")
