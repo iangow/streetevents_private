@@ -68,3 +68,7 @@ diff_permco <-
 diff_permco_calls <-
     match_compare_permco_diff_permno %>%
     inner_join(calls, by="file_name")
+
+diff_permco_calls_manual <-
+    diff_permco_calls %>%
+    inner_join(manual_permno_matches, by="file_name")
