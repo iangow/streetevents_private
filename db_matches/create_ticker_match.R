@@ -34,7 +34,7 @@ secm_tickers <-
 
 rdqs <-
     fundq %>%
-    select(gvkey, rdq) %>%
+    select(gvkey, datadate, rdq) %>%
     mutate(eomonth=eomonth(rdq)) %>%
     distinct()
 
@@ -46,7 +46,7 @@ comp_tickers <-
     inner_join(crsp_linktable) %>%
     filter(rdq >= linkdt,
            rdq <= linkenddt | is.na(linkenddt)) %>%
-    select(ticker, rdq, gvkey, permno) %>%
+    select(ticker, rdq, gvkey, datadate, permno) %>%
     compute
 
 # Match earnings announcements with calls within three days
@@ -55,7 +55,7 @@ ticker_match <-
     tickers %>%
     inner_join(comp_tickers) %>%
     filter(between(call_date, rdq, sql("rdq + interval '3 days'"))) %>%
-    select(file_name, last_update, gvkey, permno) %>%
+    select(file_name, last_update, gvkey, datadate, permno) %>%
     compute(name="ticker_match", indexes="file_name", temporary=FALSE)
 
 rs <-
