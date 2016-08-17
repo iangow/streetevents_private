@@ -66,9 +66,53 @@ diff_permco <-
     filter(!same_permco)
 
 diff_permco_calls <-
-    match_compare_permco_diff_permno %>%
+    diff_permco %>%
     inner_join(calls, by="file_name")
 
 diff_permco_calls_manual <-
     diff_permco_calls %>%
     inner_join(manual_permno_matches, by="file_name")
+
+compare_co_name <-
+    calls %>%
+    mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
+    mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
+    select(file_name, call_desc, call_co_name, co_name) %>%
+    mutate(same_co_name=call_co_name==co_name)
+
+compareNames <- function(name1, name2) {
+    clean <- function(name) {
+        return(gsub("[,.`']|INC\\w*|LTD|CORP\\w*|\\bCO\\b|COMP\\w*|\ ", "",
+                    toupper(name)))
+    }
+    return(clean(name1)==clean(name2))
+}
+
+regex <- '(?:[0-9]{4}|[0-9]{4}/[0-9]{2})(.*)(?=Results|Earnings)'
+df <-
+    diff_permco_calls %>%
+    # drops 1 row here: 1294427_T, "The Wendy's Co" & "Wendy's International"
+    mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
+    mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
+    select(file_name, same_permco, co_name, call_co_name) %>%
+    collect()
+
+df$same_co_name <- compareNames(df$call_co_name, df$co_name)
+
+diff_permco_calls_compare_name <- df
+
+diff_permco_co_names <-
+    diff_permco_calls_compare_name %>%
+    filter(!same_permco) %>%
+    select(co_name, call_co_name, same_co_name)
+
+diff_permco_co_names_summary <-
+    diff_permco_co_names %>%
+    group_by(same_co_name) %>%
+    summarise(count=n())
+
+diff_permco_distinct_co_names <-
+    diff_permco_calls_compare_name %>%
+    select(co_name, call_co_name, same_co_name) %>%
+    distinct() %>%
+    arrange(co_name)
