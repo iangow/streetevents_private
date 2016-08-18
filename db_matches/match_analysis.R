@@ -47,7 +47,7 @@ match_compare_permco <-
     inner_join(select(permno.comp_permco, permco, file_name), by="file_name",
                suffix=c(".crsp", ".comp"))
 
-match_compare_permco_diff_permno <-
+diff_permno_comp_permco <-
     match_compare_permco %>%
     filter(!same_permno) %>%
     group_by(file_name) %>%
@@ -57,12 +57,12 @@ match_compare_permco_diff_permno <-
     compute()
 
 diff_permco_summary <-
-    match_compare_permco_diff_permno %>%
+    diff_permno_comp_permco %>%
     group_by(same_permco) %>%
     summarize(count=n())
 
 diff_permco <-
-    match_compare_permco_diff_permno %>%
+    diff_permno_comp_permco %>%
     filter(!same_permco)
 
 diff_permco_calls <-
@@ -116,3 +116,17 @@ diff_permco_distinct_co_names <-
     select(co_name, call_co_name, same_co_name) %>%
     distinct() %>%
     arrange(co_name)
+
+diff_permco_match_type_summary <-
+    diff_permno_comp_permco %>%
+    inner_join(calls, by="file_name") %>%
+    filter(!same_permco) %>%
+    group_by(match_type) %>%
+    summarize(count=n())
+
+same_permco_match_type_summary <-
+    diff_permno_comp_permco %>%
+    inner_join(calls, by="file_name") %>%
+    filter(same_permco) %>%
+    group_by(match_type) %>%
+    summarize(count=n())
