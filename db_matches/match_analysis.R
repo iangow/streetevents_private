@@ -47,6 +47,16 @@ match_compare_permco <-
     inner_join(select(permno.comp_permco, permco, file_name), by="file_name",
                suffix=c(".crsp", ".comp"))
 
+match_type_permno_permco_summary <-
+    match_compare_permco %>%
+    as.data.frame() %>%
+    mutate(same_permco=permco.crsp==permco.comp) %>%
+    group_by(match_type, same_permno, same_permco) %>%
+    summarize(count=n()) %>%
+    ungroup() %>%
+    complete(match_type, same_permno, same_permco, fill=list(count=0)) %>%
+    arrange(match_type, desc(same_permno), desc(same_permco))
+
 diff_permno_comp_permco <-
     match_compare_permco %>%
     filter(!same_permno) %>%
