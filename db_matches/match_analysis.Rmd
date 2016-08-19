@@ -1,8 +1,8 @@
 ---
 title: "Match comparisons"
 date: "July 18, 2016"
-output: 
-  pdf_document 
+output:
+  pdf_document
 ---
 
 This document was produced using code in `match_analysis.Rmd`. (To make `.md` version, run `knit("match_analysis.Rmd")` followed by `pandoc('match_analysis.md', format='markdown_github')`))
@@ -16,9 +16,9 @@ knitr::opts_chunk$set(echo = TRUE)
 Our goal is to match StreetEvents conference calls to PERMNOs on CRSP.
 StreetEvents conferences calls are identified (pretty much) by their `file_name` values.
 
-We have an "automatic" match created by code in `crsp_link.sql` and stored in 
+We have an "automatic" match created by code in `crsp_link.sql` and stored in
 the database table `streetevents.crsp_link`.
-I put "automatic" in quotes because this code does leverage manual matches in a 
+I put "automatic" in quotes because this code does leverage manual matches in a
 [Google Sheets document](https://docs.google.com/spreadsheets/d/14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg/).
 
 We also have a table that represents our *current* definitive mapping in `streetevents.company_link`.
@@ -31,8 +31,8 @@ So the first order of business is to examine differences between
 - Are the matches in `streetevents.company_link` generally better?
 - Are differences in PERMNO matches to unrelated firms? Or to the same firm (i.e., same `permco`) but different security (i.e., different `permno`).
     - If the latter, are we getting the "right" `permno` in general in  `streetevents.company_link`?
-- Can we come up with a way of flagging cases that need correction? 
-    - Differences between  `streetevents.company_link` and `streetevents.crsp_link` will often represent bad matches in `streetevents.company_link` that we identified and corrected. 
+- Can we come up with a way of flagging cases that need correction?
+    - Differences between  `streetevents.company_link` and `streetevents.crsp_link` will often represent bad matches in `streetevents.company_link` that we identified and corrected.
 How can we identify these? One known issue is the tendency of ThomsonReuters (the provider of StreetEvents) to "backdate" ticker and company names for acquired companies. These can usually be identified by discrepancies between `co_name` and `call_desc`.
 
 ```{r load_packages, include=FALSE}
@@ -40,7 +40,7 @@ library(dplyr)
 library(knitr)
 ```
 
-```{r data_step, warning=FALSE}
+```{r data_step, warning=FALSE, include=FALSE}
 # Use Sys.setenv(PGUSER = "rudyardrichter", PGPASSWORD = "xxxxxx") if necessary.
 pg <- src_postgres(host = "aaz.chicagobooth.edu", dbname = "postgres")
 
@@ -57,33 +57,18 @@ calls <- tbl_pg("streetevents.calls")
 stocknames <- tbl_pg("crsp.stocknames")
 ```
 
-## StreetEvents data
-
-Here's a small snippet of data from the `streetevents.calls`.
-(More detailed information about the calls (what was said, by whom, etc.) is found in 
-`streetevents.speaker_data`.)
-
-```{r calls}
-calls %>% 
-    filter(call_type==1L, !is.na(call_date)) %>% 
-    select(file_name, ticker, co_name, call_desc, call_date) %>% 
-    top_n(10) %>%
-    mutate(call_date=sql("call_date::date")) %>%
-    kable()
-```
-
 # Comparing `streetevents.crsp_link` and `streetevents.company_link`
 
-Let's join these two tables using `file_name` to see how often we get the same 
+Let's join these two tables using `file_name` to see how often we get the same
 `permno` in both tables.
 
-```{r match_compare}
+```{r match_compare, echo=FALSE}
 # How many firms have the same PERMNO as identified with
 # the ticker match?
 match_compare <-
     crsp_link %>%
-    inner_join(company_link, by="file_name") %>%
-    mutate(same_permno=permno.x==permno.y) %>%
+    inner_join(company_link, by="file_name", suffix=c(".crsp", ".comp")) %>%
+    mutate(same_permno=permno.crsp==permno.comp) %>%
     compute()
 ```
 
@@ -98,22 +83,71 @@ same_stat <-
 It seems we get the same match in `r sprintf("%.0f%%", same_stat*100)` of cases.
 
 Here are the raw numbers:
-```{r compare}
-match_compare %>%
+```{r compare, echo=FALSE}
+    match_compare %>%
     group_by(same_permno) %>%
     summarize(count=n()) %>%
     kable()
 ```
 
-To facilitate examination of the cases where the two tables differ, 
-I saved data to CSV, which I then made into a Google Sheets document
-[here](https://docs.google.com/spreadsheets/d/1IN5b-wXDiqDKxyVq3KEfTo3zv90_GlkvPxh5HJCRvvg/).
+```{r more_stuff}
+# How many firms have the same PERMNO as identified with
+# the ticker match?
+permcos <-
+    stocknames %>%
+    select(permco, permno) %>%
+    distinct
 
-```{r diffs}
+regex <- '(?:[0-9]{4}|[0-9]{4}/[0-9]{2})(.*)(?=Results|Earnings)'
+
+clean <- function(df, var) {
+    df %>%
+        mutate(temp=var)
+}
+
+regex_punc <- "[,.`']"
+
+regex_clean <-"\\s*(INC\\w*|LTD|CORP\\w*|CO|COMP\\w*)(\\s*|$)"
+
+match_compare_plus <-
+    match_compare %>%
+    inner_join(calls %>% select(file_name, co_name, call_desc) %>% distinct) %>%
+    inner_join(permcos, by=c("permno.crsp"="permno")) %>%
+    rename(permco.crsp=permco) %>%
+    inner_join(permcos, by=c("permno.comp"="permno")) %>%
+    rename(permco.comp=permco) %>%
+    mutate(same_permco=permco.comp==permco.crsp) %>%
+    mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
+    mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
+    select(file_name, same_permno, same_permco, co_name, call_co_name) %>%
+     mutate(clean_call_co_name=regexp_replace(upper(call_co_name), regex_punc, '', 'g'),
+           clean_co_name=regexp_replace(upper(co_name), regex_punc, '', 'g')) %>%
+    mutate(clean_call_co_name=regexp_replace(clean_call_co_name, regex_clean, '', 'g'),
+           clean_co_name=regexp_replace(clean_co_name, regex_clean, '', 'g')) %>%
+    mutate(same_co_name=clean_call_co_name==clean_co_name) %>%
+    compute()
+
 library(readr)
-match_compare %>%
-    filter(!same_permno) %>%
-    inner_join(calls) %>%
+match_compare_plus %>% 
+    filter(same_permno, !same_co_name) %>% 
+    select(co_name, call_co_name, clean_co_name) %>%
     as.data.frame() %>%
-    write_csv("permno_match_diffs.csv")
+    write_csv("~/Google Drive/name_matches.csv")
+
+match_compare_plus %>%
+    select(co_name, call_co_name, same_permno, same_co_name) %>%
+    distinct %>%
+    group_by(same_permno, same_co_name) %>%
+    summarize(count=n()) %>%
+    kable
+
+
+match_compare_plus %>% 
+    filter(same_permno, !same_co_name) %>% 
+    group_by(co_name, call_co_name) %>%
+    summarize(file_names=array_agg(file_name)) %>%
+    mutate(num_calls=array_length(file_names, 1L)) %>%
+    arrange(desc(num_calls), co_name, call_co_name) %>%
+    as.data.frame() %>%
+    write_csv("~/Google Drive/name_matches.csv")
 ```
