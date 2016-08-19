@@ -15,6 +15,13 @@ manual_permno_matches <- tbl_pg("streetevents.manual_permno_matches")
 calls <- tbl_pg("streetevents.calls")
 stocknames <- tbl_pg("crsp.stocknames")
 
+summarize_counts_by <- function(data, ...) {
+    data %>%
+    group_by(...) %>%
+    summarize(count=n()) %>%
+    return()
+}
+
 # How many firms have the same PERMNO as identified with
 # the ticker match?
 match_compare <-
@@ -25,51 +32,47 @@ match_compare <-
 
 match_compare_summary <-
     match_compare %>%
-    group_by(same_permno) %>%
-    summarize(count=n())
+    summarize_counts_by(same_permno)
 
 match_compare_diff_permno <-
     match_compare %>%
     filter(!same_permno) %>%
     inner_join(calls)
 
+# Add permco matching permno.crsp to comparison
 permno.crsp_permco <-
     match_compare %>%
     inner_join(select(stocknames, permco, permno), by=c("permno.crsp"="permno"))
 
+# Add permco matching permno.comp to comparison
 permno.comp_permco <-
     match_compare %>%
-    # select(file_name, permno.y) %>%
     inner_join(select(stocknames, permco, permno), by=c("permno.comp"="permno"))
 
+# Join the tables with permco for both crsp and comp
 match_compare_permco <-
     permno.crsp_permco %>%
     inner_join(select(permno.comp_permco, permco, file_name), by="file_name",
-               suffix=c(".crsp", ".comp"))
+               suffix=c(".crsp", ".comp")) %>%
+    mutate(same_permco=permco.crsp==permco.comp)
 
+# Count of (match_type, same_permno, same_permco) for all combinations:
+# 0 <= match_type < 11, same_permno, same_permco = TRUE | FALSE
 match_type_permno_permco_summary <-
     match_compare_permco %>%
     as.data.frame() %>%
-    mutate(same_permco=permco.crsp==permco.comp) %>%
-    group_by(match_type, same_permno, same_permco) %>%
-    summarize(count=n()) %>%
+    summarize_counts_by(match_type, same_permno, same_permco) %>%
     ungroup() %>%
     complete(match_type, same_permno, same_permco, fill=list(count=0)) %>%
     arrange(match_type, desc(same_permno), desc(same_permco))
 
 diff_permno_comp_permco <-
     match_compare_permco %>%
-    filter(!same_permno) %>%
-    group_by(file_name) %>%
-    filter(row_number() == 1) %>%
-    ungroup() %>%
-    mutate(same_permco=permco.crsp==permco.comp) %>%
-    compute()
+    filter(!same_permno)
 
 diff_permco_summary <-
     diff_permno_comp_permco %>%
-    group_by(same_permco) %>%
-    summarize(count=n())
+    summarize_counts_by(same_permco)
 
 diff_permco <-
     diff_permno_comp_permco %>%
@@ -83,13 +86,6 @@ diff_permco_calls_manual <-
     diff_permco_calls %>%
     inner_join(manual_permno_matches, by="file_name")
 
-compare_co_name <-
-    calls %>%
-    mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
-    mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
-    select(file_name, call_desc, call_co_name, co_name) %>%
-    mutate(same_co_name=call_co_name==co_name)
-
 compareNames <- function(name1, name2) {
     clean <- function(name) {
         return(gsub("[,.`']|INC\\w*|LTD|CORP\\w*|\\bCO\\b|COMP\\w*|\ ", "",
@@ -98,18 +94,36 @@ compareNames <- function(name1, name2) {
     return(clean(name1)==clean(name2))
 }
 
-regex <- '(?:[0-9]{4}|[0-9]{4}/[0-9]{2})(.*)(?=Results|Earnings)'
-df <-
+check_co_name <- function(data, exact) {
+    if (missing(exact)) {
+        exact <- FALSE
+    }
+    regex <- '(?:[0-9]{4}|[0-9]{4}/[0-9]{2})(.*)(?=Results|Earnings)'
+    df <-
+        data %>%
+        mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
+        mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
+        select(-co_name_matches) %>%
+        as.data.frame()
+    if (exact) {
+        df$same_co_name <- df$call_co_name == df$co_name
+    } else {
+        df$same_co_name <- compareNames(df$call_co_name, df$co_name)
+    }
+    return(df)
+}
+
+compare_co_name <-
+    calls %>%
+    check_co_name(exact=TRUE) %>%
+    select(file_name, call_desc, call_co_name, co_name)
+
+diff_permco_calls_compare_name <-
     diff_permco_calls %>%
     # drops 1 row here: 1294427_T, "The Wendy's Co" & "Wendy's International"
-    mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
-    mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
-    select(file_name, same_permco, co_name, call_co_name) %>%
+    check_co_name() %>%
+    select(file_name, same_permco, co_name, call_co_name, same_co_name) %>%
     collect()
-
-df$same_co_name <- compareNames(df$call_co_name, df$co_name)
-
-diff_permco_calls_compare_name <- df
 
 diff_permco_co_names <-
     diff_permco_calls_compare_name %>%
@@ -118,8 +132,7 @@ diff_permco_co_names <-
 
 diff_permco_co_names_summary <-
     diff_permco_co_names %>%
-    group_by(same_co_name) %>%
-    summarise(count=n())
+    summarize_counts_by(same_co_name)
 
 diff_permco_distinct_co_names <-
     diff_permco_calls_compare_name %>%
@@ -131,12 +144,10 @@ diff_permco_match_type_summary <-
     diff_permno_comp_permco %>%
     inner_join(calls, by="file_name") %>%
     filter(!same_permco) %>%
-    group_by(match_type) %>%
-    summarize(count=n())
+    summarize_counts_by(match_type)
 
 same_permco_match_type_summary <-
     diff_permno_comp_permco %>%
     inner_join(calls, by="file_name") %>%
     filter(same_permco) %>%
-    group_by(match_type) %>%
-    summarize(count=n())
+    summarize_counts_by(match_type)
