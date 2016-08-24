@@ -1,18 +1,11 @@
-require(RCurl)
-
-getSheetData = function(key, gid=NULL) {
-  library(RCurl)
-  url <- paste0("https://docs.google.com/spreadsheets/d/", key,
-                "/export?format=csv&id=", key, if (is.null(gid)) "" else paste0("&gid=", gid),
-                "&single=true")
-  csv_file <- getURL(url, verbose=FALSE)
-  the_data <- read.csv(textConnection(csv_file), as.is=TRUE)
-  return( the_data )
-}
-
-key <- "14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg"
+library(googlesheets)
+# Run gs_auth() as once-per-computer authorization step
 gid <- 1613221647
-permnos <- getSheetData(key, gid)
+
+gs <- gs_key("14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg")
+
+
+permnos <- gs_read(gs)
 
 pg_comment <- function(table, comment) {
     library(RPostgreSQL)
@@ -30,13 +23,11 @@ rs <- dbWriteTable(pg, c("streetevents", "manual_permno_matches"),
                    permnos,
                    overwrite=TRUE, row.names=FALSE)
 
-rs <- dbGetQuery(pg, "
-    ALTER TABLE streetevents.manual_permno_matches
+rs <- dbGetQuery(pg, "ALTER TABLE streetevents.manual_permno_matches
     OWNER TO personality_access")
 
-dbGetQuery(pg, "
-    DELETE
-    FROM streetevents.manual_permno_matches
+rs <- dbGetQuery(pg,
+    "DELETE FROM streetevents.manual_permno_matches
     WHERE file_name IN (
         SELECT file_name
         FROM streetevents.manual_permno_matches
@@ -46,8 +37,6 @@ dbGetQuery(pg, "
 
     CREATE INDEX ON streetevents.manual_permno_matches (file_name);
 ")
-
-
 
 rs <- dbDisconnect(pg)
 
