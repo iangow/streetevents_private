@@ -3,3 +3,4 @@ call_meta_data.txt.gz
 *.Rout
 .Rhistory
 .RData
+.httr-oauth
