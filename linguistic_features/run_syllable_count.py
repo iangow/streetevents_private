@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from sqlalchemy import create_engine
 from process_file_syllables import processFile, the_table, \
-                                    the_schema, conn_string 
+                                    the_schema, conn_string
 engine = create_engine(conn_string)
 
 from multiprocessing import Pool
@@ -25,10 +25,9 @@ def getFileNames(the_table, the_schema, num_files=None):
     if table_exists:
         sql = """
             WITH latest_call AS (
-                SELECT file_name, max(last_update) as last_update
+                SELECT file_name, last_update
                 FROM streetevents.calls
-                WHERE call_type=1
-                GROUP BY file_name)
+                WHERE call_type=1)
             SELECT file_name, last_update
             FROM latest_call
             EXCEPT
@@ -49,9 +48,8 @@ def getFileNames(the_table, the_schema, num_files=None):
         engine.execute(sql)
 
         sql = """
-            SELECT file_name, max(last_update) as last_update
+            SELECT file_name, last_update as last_update
             FROM streetevents.qa_pairs
-            GROUP BY file_name
             %s
         """ % (limit_clause)
         files = pd.read_sql(sql, engine)
