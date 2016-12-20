@@ -39,12 +39,9 @@ match_repair <-
     inner_join(calls %>%
                    select(file_name, co_name, call_desc, call_date)) %>%
     inner_join(comnams %>% rename(permno.crsp=permno,
-                                  comnams.crsp=comnams,
-                                  permco.crsp=permco)) %>%
+                                  comnams.crsp=comnams)) %>%
     inner_join(comnams %>% rename(permno.comp=permno,
-                                  comnams.comp=comnams,
-                                  permco.comp=permco)) %>%
-    filter(permco.crsp != permco.comp) %>%
+                                  comnams.comp=comnams)) %>%
     compute()
 
 match_repair %>%
