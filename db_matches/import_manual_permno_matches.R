@@ -1,10 +1,9 @@
 library(googlesheets)
-# Run gs_auth() as once-per-computer authorization step
+
+# You may need to run gs_auth() to set this up
+key <- "14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg"
 gid <- 1613221647
-
-gs <- gs_key("14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg")
-
-
+gs <- gs_key(key)
 permnos <- gs_read(gs)
 
 pg_comment <- function(table, comment) {
@@ -23,8 +22,9 @@ rs <- dbWriteTable(pg, c("streetevents", "manual_permno_matches"),
                    permnos,
                    overwrite=TRUE, row.names=FALSE)
 
-rs <- dbGetQuery(pg, "ALTER TABLE streetevents.manual_permno_matches
-    OWNER TO personality_access")
+rs <- dbGetQuery(pg, "
+    ALTER TABLE streetevents.manual_permno_matches
+    OWNER TO streetevents_access")
 
 rs <- dbGetQuery(pg,
     "DELETE FROM streetevents.manual_permno_matches
