@@ -140,14 +140,4 @@ match_compare_plus %>%
     group_by(same_permno, same_co_name) %>%
     summarize(count=n()) %>%
     kable
-
-
-match_compare_plus %>% 
-    filter(same_permno, !same_co_name) %>% 
-    group_by(co_name, call_co_name) %>%
-    summarize(file_names=array_agg(file_name)) %>%
-    mutate(num_calls=array_length(file_names, 1L)) %>%
-    arrange(desc(num_calls), co_name, call_co_name) %>%
-    as.data.frame() %>%
-    write_csv("~/Google Drive/name_matches.csv")
 ```
