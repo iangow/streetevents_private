@@ -1,10 +1,18 @@
 library(googlesheets)
 
 # You may need to run gs_auth() to set this up
-key <- "14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg"
-gid <- 1613221647
-gs <- gs_key(key)
-permnos <- gs_read(gs)
+gs <- gs_key("14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg")
+permnos <- gs_read(gs, ws = "manual_permno_matches")
+
+permnos_addl <-
+    gs_read(gs, ws = "match_repair.csv") %>%
+    filter(!same_permco) %>%
+    select(file_name, permno, co_name) %>%
+    mutate(comment = "Cases resolved using company names in 2017")
+
+permnos <-
+    gs_read(gs, ws = "manual_permno_matches") %>%
+    union(permnos_addl)
 
 pg_comment <- function(table, comment) {
     library(RPostgreSQL)
