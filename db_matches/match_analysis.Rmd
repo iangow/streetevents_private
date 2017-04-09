@@ -5,7 +5,7 @@ output:
   pdf_document
 ---
 
-This document was produced using code in `match_analysis.Rmd`. (To make `.md` version, run `knit("match_analysis.Rmd")` followed by `pandoc('match_analysis.md', format='markdown_github')`))
+This document was produced using code in `match_analysis.Rmd`. (To make a `.md` version, run `knit("match_analysis.Rmd")` followed by `pandoc('match_analysis.md', format='markdown_github')`))
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -21,11 +21,11 @@ the database table `streetevents.crsp_link`.
 I put "automatic" in quotes because this code does leverage manual matches in a
 [Google Sheets document](https://docs.google.com/spreadsheets/d/14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg/).
 
-We also have a table that represents our *current* definitive mapping in `streetevents.company_link`.
-But this table is out of date and we need to update it.
-Unfortunately, the process by which it was created is not well understood.
+We also have a table that represented our *prior* definitive mapping in `streetevents.company_link`.
+But this table was out of date and we needed to update it.
+Unfortunately, the process by which it was created was not well understood and not documented.
 
-So the first order of business is to examine differences between
+So the first order of business was to examine differences between
 `streetevents.crsp_link` and `streetevents.company_link`:
 
 - Are the matches in `streetevents.company_link` generally better?
@@ -63,20 +63,32 @@ Let's join these two tables using `file_name` to see how often we get the same
 `permno` in both tables.
 
 ```{r match_compare, echo=FALSE}
-# How many firms have the same PERMNO as identified with
+# How many firms have the same PERMCO as identified with
 # the ticker match?
 match_compare <-
     crsp_link %>%
-    inner_join(company_link, by="file_name", suffix=c(".crsp", ".comp")) %>%
-    mutate(same_permno=permno.crsp==permno.comp) %>%
+    inner_join(company_link, by="file_name", suffix=c("_crsp", "_comp")) %>%
+    
+    inner_join(
+        stocknames %>% 
+            select(permno, permco) %>%
+            distinct() %>% 
+            rename(permno_comp=permno, permco_comp=permco), by="permno_comp") %>%
+    inner_join(
+        stocknames %>% 
+            select(permno, permco) %>%
+            distinct() %>% 
+            rename(permno_crsp=permno, permco_crsp=permco), by="permno_crsp") %>%
+    mutate(same_permno=permno_crsp==permno_comp,
+           same_permco=permco_crsp==permco_comp) %>%
     compute()
+
 ```
 
 ```{r stat, include=FALSE}
 same_stat <-
     match_compare %>%
-    mutate(same_permno=as.integer(same_permno)) %>%
-    summarize(sum(same_permno*1)/count(same_permno)) %>%
+    summarize(sum(as.integer(same_permco)*1)/count(same_permco)) %>%
     collect() %>%
     .[[1]]
 ```
@@ -85,59 +97,16 @@ It seems we get the same match in `r sprintf("%.0f%%", same_stat*100)` of cases.
 Here are the raw numbers:
 ```{r compare, echo=FALSE}
     match_compare %>%
-    group_by(same_permno) %>%
+    group_by(same_permco) %>%
     summarize(count=n()) %>%
     kable()
 ```
 
-```{r more_stuff}
-# How many firms have the same PERMNO as identified with
-# the ticker match?
-permcos <-
-    stocknames %>%
-    select(permco, permno) %>%
-    distinct
+I have checked the few remaining cases of disagreement and we currently have the right (manual) match.
 
-regex <- '(?:[0-9]{4}|[0-9]{4}/[0-9]{2})(.*)(?=Results|Earnings)'
-
-clean <- function(df, var) {
-    df %>%
-        mutate(temp=var)
-}
-
-regex_punc <- "[,.`']"
-
-regex_clean <-"\\s*(INC\\w*|LTD|CORP\\w*|CO|COMP\\w*)(\\s*|$)"
-
-match_compare_plus <-
+```{r disagree_match_type, echo=FALSE}
     match_compare %>%
-    inner_join(calls %>% select(file_name, co_name, call_desc) %>% distinct) %>%
-    inner_join(permcos, by=c("permno.crsp"="permno")) %>%
-    rename(permco.crsp=permco) %>%
-    inner_join(permcos, by=c("permno.comp"="permno")) %>%
-    rename(permco.comp=permco) %>%
-    mutate(same_permco=permco.comp==permco.crsp) %>%
-    mutate(co_name_matches=regexp_matches(call_desc, regex)) %>%
-    mutate(call_co_name=sql("trim(both from co_name_matches[1])")) %>%
-    select(file_name, same_permno, same_permco, co_name, call_co_name) %>%
-     mutate(clean_call_co_name=regexp_replace(upper(call_co_name), regex_punc, '', 'g'),
-           clean_co_name=regexp_replace(upper(co_name), regex_punc, '', 'g')) %>%
-    mutate(clean_call_co_name=regexp_replace(clean_call_co_name, regex_clean, '', 'g'),
-           clean_co_name=regexp_replace(clean_co_name, regex_clean, '', 'g')) %>%
-    mutate(same_co_name=clean_call_co_name==clean_co_name) %>%
-    compute()
-
-library(readr)
-match_compare_plus %>% 
-    filter(same_permno, !same_co_name) %>% 
-    select(co_name, call_co_name, clean_co_name) %>%
-    as.data.frame() %>%
-    write_csv("~/Google Drive/name_matches.csv")
-
-match_compare_plus %>%
-    select(co_name, call_co_name, same_permno, same_co_name) %>%
-    distinct %>%
-    group_by(same_permno, same_co_name) %>%
-    summarize(count=n()) %>%
-    kable
+    filter(!same_permco) %>%
+    count(match_type_desc) %>%
+    kable()
 ```
