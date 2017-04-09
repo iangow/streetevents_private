@@ -1,6 +1,8 @@
 /*******************************
 OBJECTIVE: Match streetevents.calls with PERMNOs from crsp.stocknames
 *******************************/
+DROP VIEW IF EXISTS streetevents.company_link;
+
 DROP TABLE IF EXISTS streetevents.crsp_link;
 
 CREATE TABLE streetevents.crsp_link AS
@@ -206,3 +208,5 @@ ORDER BY file_name;
 ALTER TABLE streetevents.crsp_link OWNER TO personality_access;
 
 CREATE INDEX ON streetevents.crsp_link (file_name);
+
+CREATE VIEW streetevents.company_link AS SELECT * FROM streetevents.crsp_link;
