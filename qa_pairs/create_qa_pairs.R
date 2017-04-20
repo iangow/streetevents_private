@@ -20,22 +20,25 @@ if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
         GRANT SELECT ON streetevents.qa_pairs TO personality_access;")
 }
 
-# Get a list of files on StreetEvents, but not on qa_pairs table.
-file_list <- dbGetQuery(pg, "
-    SET work_mem='3GB';
-
-    SELECT DISTINCT file_name, last_update
-    FROM streetevents.calls AS a
-    WHERE call_type=1 AND
-        (file_name, last_update) NOT IN
-            (SELECT file_name, last_update
-             FROM streetevents.qa_pairs)")
-
 rs <- dbDisconnect(pg)
+
+# Get a list of files on StreetEvents, but not on qa_pairs table.
+library(dplyr, warn.conflicts = FALSE)
+pg <- src_postgres()
+
+calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
+qa_pairs <- tbl(pg, sql("SELECT * FROM streetevents.qa_pairs"))
+
+file_list <-
+    calls %>%
+    filter(call_type == 1L) %>%
+    select(file_name, last_update) %>%
+    anti_join(qa_pairs) %>%
+    collect(n = Inf)
 
 # A function that calls the parameterized query to process each file
 addQAPairs <- function(file_name) {
-    library("RPostgreSQL")
+    library(RPostgreSQL)
     sql <- paste(readLines("qa_pairs/create_qa_pairs.sql"), collapse="\n")
 
     pg <- dbConnect(PostgreSQL())
