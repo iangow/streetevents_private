@@ -1,27 +1,30 @@
-from sqlalchemy import create_engine
-import os
+import re
 
-host = os.getenv('PGHOST', "localhost")
-dbname = os.getenv('PGDATABASE', "postgres")
+categories = ["positive", "negative", "uncertainty",
+                "litigious", "modal_strong", "modal_weak"]
 
-conn_string = 'postgresql://' + host + '/' + dbname
-engine = create_engine(conn_string)
+base_url = "http://www3.nd.edu/~mcdonald/Data/Finance_Word_Lists"
 
-from pandas import read_sql
+partial_urls = ["LoughranMcDonald_Positive.csv",
+        "LoughranMcDonald_Negative.csv",
+        "LoughranMcDonald_Uncertainty.csv",
+        "LoughranMcDonald_Litigious.csv",
+        "LoughranMcDonald_ModalStrong.csv",
+         "LoughranMcDonald_ModalWeak.csv"]
 
-df = read_sql("SELECT * FROM streetevents.lm_tone", engine)
+urls = [base_url + "/" + url for url in partial_urls]
 
-categories = [category for category in df['category']]
+def get_word_list(url):
+    import csv
+    import urllib.request
 
-import re, json
+    webpage = urllib.request.urlopen(url)
+    datareader = csv.reader(webpage.read().decode('utf-8').splitlines())
+    return [row[0].lower() for row in datareader]
 
-def flatten(a_list):
-    return [item for sublist in a_list for item in sublist]
+[get_word_list(url) for url in urls]
 
-mod_word_list = {}
-for cat in categories:
-    word_list = flatten(df.loc[df["category"] == cat, "word_list"])
-    mod_word_list[cat] = [word.lower() for word in word_list]
+mod_word_list = {tuple[0]: get_word_list(tuple[1]) for tuple in zip(categories, urls)}
 
 # Pre-compile regular expressions.
 regex_list = {}
