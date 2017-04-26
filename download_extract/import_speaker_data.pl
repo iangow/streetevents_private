@@ -97,7 +97,6 @@ sub analyse_text {
       $employer= "";
       $role ="";
     }
-    # print("$sql\n");
 
     # Output results num_sentences
     $sql = "INSERT INTO streetevents.speaker_data ";
