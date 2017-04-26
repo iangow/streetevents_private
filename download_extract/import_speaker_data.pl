@@ -127,6 +127,12 @@ foreach my $event ($doc->findnodes('/Event')) {
   my $last_update = $event->findvalue('./@lastUpdate');
   my $lines = decode_entities($event->findnodes('./EventStory/Body'));
 
+
+  # Delete existing data, if any
+  $sql = "DELETE FROM streetevents.speaker_data ";
+  $sql .= "WHERE file_name = '$basename' AND last_update = '$last_update'";
+  $dbh->do($sql);
+
   # Skip calls without tickers
   # if (!defined $ticker or $ticker =~ /^\s*$/) { next; }
 
