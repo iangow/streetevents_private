@@ -1,4 +1,6 @@
 library(dplyr, warn.conflicts = FALSE)
+library(RPostgreSQL)
+
 pg <- src_postgres()
 
 dbGetQuery(pg$con, "SET work_mem='10GB'")
@@ -27,7 +29,6 @@ duplicate_speakers <-
     filter(count > 1) %>%
     ungroup() %>%
     compute()
-
 
 library(RPostgreSQL)
 delete_speaker_data <- function(file_name) {
