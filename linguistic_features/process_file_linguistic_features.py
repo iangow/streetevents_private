@@ -16,7 +16,7 @@ engine = create_engine(conn_string)
 input_schema = "streetevents"
 input_table = "speaker_data"
 output_schema = "streetevents"
-output_table = "tone_data"
+output_table = "linguistic_features"
 
 
 
@@ -36,7 +36,7 @@ def processFile(file_name):
               index=False)
     conn.close()
 
-def getToneData(file_name):
+def getLFData(file_name):
     from pandas.io.sql import read_sql
     
     conn = engine.connect()
