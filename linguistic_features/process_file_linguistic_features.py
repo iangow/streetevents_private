@@ -23,7 +23,7 @@ output_table = "linguistic_features"
 def processFile(file_name):
 
     # Get syllable data for the file_name
-    speaker_data = getToneData(file_name)
+    speaker_data = getLFData(file_name)
     for cat in categories:
         speaker_data[cat] = speaker_data['speaker_text'].map(lambda x: get_tone_data(x, cat))    
     speaker_data['num_count'] = speaker_data['speaker_text'].map(num_count)

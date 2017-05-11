@@ -2,7 +2,7 @@
 import pandas as pd
 from sqlalchemy import create_engine
 from multiprocessing import Pool
-from process_file_tone import processFile, conn_string, \
+from process_file_linguistic_features import processFile, conn_string, \
         input_table, input_schema, output_table, output_schema
 
 
