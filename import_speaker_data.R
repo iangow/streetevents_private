@@ -45,19 +45,35 @@ extract_speaker_data <- function(file_path) {
     }
 
     extract_speaker <- function(speaker) {
-        temp <- str_match(speaker, "^(.*)\\s+\\[(\\d+)\\]")
-        speaker_number <- temp[, 3]
-        full_name <- temp[ ,2]
+        temp2 <- str_match(speaker, "^(.*)\\s+\\[(\\d+)\\]")
+        if (dim(temp2)[2] >= 3) {
+            speaker_number <- temp2[, 3]
+            full_name <- temp2[, 2]
 
-        temp <- str_match(full_name, "^([^,]*),\\s*(.*)\\s+-\\s+(.*)$")
-        speaker_name = if_else(is.na(temp[, 2]), full_name, str_trim(temp[, 2]))
-        employer <- str_trim(coalesce(temp[, 3], ""))
-        role <- str_trim(coalesce(temp[, 4], ""))
-
+            spaces <- "[\\s\\p{WHITE_SPACE}\u3000\ua0]"
+            regex <- str_c("^([^,]*),", spaces, "*(.*)", spaces, "+-", spaces,
+                           "+(.*)$")
+            temp3 <- str_match(full_name, regex)
+            if (dim(temp3)[2] >= 4) {
+                speaker_name <- if_else(is.na(full_name), full_name, str_trim(temp3[, 2]))
+                speaker_name <- str_trim(speaker_name)
+                employer <- str_trim(coalesce(temp3[, 3], ""))
+                role <- str_trim(coalesce(temp3[, 4], ""))
+            } else {
+                speaker_name <- NA
+                employer <- NA
+                role <- NA
+            }
+        } else {
+            speaker_number <- NA
+            speaker_name <- NA
+            employer <- NA
+            role <- NA
+        }
         tibble(file_path, speaker_name, employer, role, speaker_number)
     }
 
-    pres <- sections[grepl("^(Presentation|Transcript)", sections)]
+    pres <- sections[grepl("^(Presentation|Transcript)\n", sections)]
 
     if (length(pres) > 0) {
         pres_df <-
@@ -104,6 +120,11 @@ if (!dbExistsTable(pg, c("streetevents", "speaker_data_alt"))) {
 
        CREATE INDEX ON streetevents.speaker_data_alt (file_path);")
 }
+
+if (!dbExistsTable(pg, c("streetevents", "speaker_data_dupes"))) {
+    dbGetQuery(pg, "
+        CREATE TABLE streetevents.speaker_data_dupes (file_path text);")
+}
 rs <- dbDisconnect(pg)
 
 process_calls <- function(num_calls = 1000, file_list = NULL) {
@@ -111,6 +132,7 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
 
     calls <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
     speaker_data_alt <- tbl(pg, sql("SELECT * FROM streetevents.speaker_data_alt"))
+    speaker_data_dupes <- tbl(pg, sql("SELECT * FROM streetevents.speaker_data_dupes"))
 
     if (is.null(file_list)) {
 
@@ -118,22 +140,48 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
             calls %>%
             arrange(random()) %>%
             anti_join(speaker_data_alt, by = "file_path") %>%
+            anti_join(speaker_data_dupes, by = "file_path") %>%
             collect(n=num_calls)
     }
 
-    speaker_data <- bind_rows(mclapply(file_list$file_path, extract_speaker_data,
-                                       mc.cores=6))
+    speaker_data <-
+        bind_rows(lapply(file_list$file_path, extract_speaker_data)) %>%
+        filter(speaker_text != "")
+    print(sprintf("Speaker data has %d rows", nrow(speaker_data)))
 
-    dupes <-
-        speaker_data %>%
-        group_by(file_path, speaker_number, context, section) %>%
-        filter(n()>1) %>%
-        nrow() > 0
+    if (nrow(speaker_data) == 0) {
+        dupes <- file_list
+    } else {
+        dupes <-
+            speaker_data %>%
+            group_by(file_path, speaker_number, context, section) %>%
+            filter(n()>1) %>%
+            ungroup() %>%
+            union_all(
+                speaker_data %>%
+                    filter(is.na(speaker_number) | is.na(context) | is.na(section)))
 
-    if (!dupes) {
-        dbWriteTable(pg$con, c("streetevents", "speaker_data_alt"), speaker_data,
-                     row.names=FALSE, append=TRUE)
+        speaker_data <-
+            speaker_data %>%
+            anti_join(dupes, by="file_path")
     }
+
+    print("Writing data to Postgres")
+
+    dbWriteTable(pg$con, c("streetevents", "speaker_data_alt"),
+                 speaker_data, row.names=FALSE, append=TRUE)
+
+    print("Writing dupe data to Postgres")
+    file_path <- dupes %>% select(file_path) %>% distinct()
+    dbWriteTable(pg$con, c("streetevents", "speaker_data_dupes"), file_path,
+                 row.names=FALSE, append=TRUE)
 }
 
-system.time(process_calls())
+for (i in 1:1) {
+    system.time(process_calls(num_calls = 100))
+}
+library(tibble)
+
+file_list = tibble(file_path = "StreetEvents_historical_backfill_through_May2013/dir_1/1360941_T.xml")
+process_calls(file_list = file_list)
+
