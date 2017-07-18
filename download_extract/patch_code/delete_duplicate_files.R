@@ -24,11 +24,12 @@ dupe_file_names <-
 # Cases with duplicate data in speaker_data (what we care about)
 duplicate_speakers <-
     speaker_data %>%
-    group_by(file_name, last_update, speaker_name, speaker_number, context) %>%
-    summarize(count = n()) %>%
+    group_by(file_name, last_update, speaker_number, context) %>%
     filter(count > 1) %>%
     ungroup() %>%
     compute()
+
+duplicate_speakers %>% select(file_name) %>% distinct() %>% semi_join(calls %>% filter(call_type==1L)) %>% inner_join(calls) %>% collect() %>% ggplot(aes(x=last_update)) + geom_histogram(binwidth=30) + scale_x_datetime()
 
 library(RPostgreSQL)
 delete_speaker_data <- function(file_name) {
