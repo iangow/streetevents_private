@@ -4,7 +4,7 @@ library(stringr)
 library(dplyr)
 library(parallel)
 
-se_path <- file.path(Sys.getenv("EDGAR_DIR"), "streetevents_project")
+se_path <- file.path(Sys.getenv("EDGAR_DIR"), "uploads")
 
 unescape_xml <- function(str) {
     xml_text(read_html(paste0("<x>", str, "</x>")))
@@ -14,7 +14,6 @@ extract_speaker_data <- function(file_path) {
     full_path <- file.path(se_path, file_path)
     if (!file.exists(full_path)) return(NULL)
 
-    print(file_path)
     file_xml <- read_xml(file.path(se_path, file_path), options = "NOENT")
     lines <- xml_text(xml_child(file_xml, search = "/EventStory/Body"))
     lines <- gsub("\\r\\n", "\n", lines, perl = TRUE)
@@ -177,11 +176,6 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
                  row.names=FALSE, append=TRUE)
 }
 
-for (i in 1:1) {
-    system.time(process_calls(num_calls = 100))
+for (i in 1:10) {
+    system.time(process_calls(num_calls = 1000))
 }
-library(tibble)
-
-file_list = tibble(file_path = "StreetEvents_historical_backfill_through_May2013/dir_1/1360941_T.xml")
-process_calls(file_list = file_list)
-
