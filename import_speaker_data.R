@@ -1,4 +1,12 @@
 #!/usr/bin/env Rscript
+# set env
+# install.packages("xml2")
+# install.packages("stringr")
+# install.packages("dplyr")
+# install.packages("RPostgreSQL")
+# install.packages("dbplyr")
+# Sys.setenv(PGHOST = "aaz.chicagobooth.edu",PGDATABASE = "postgres",PGUSER = pg_username)
+
 library(xml2)
 library(stringr)
 library(dplyr)
@@ -40,6 +48,8 @@ extract_speaker_data <- function(file_path) {
         speaker <- gsub("\\n", " ", speaker)
         speaker <- gsub("\\s{2,}", " ", speaker)
         speaker <- str_trim(speaker)
+        print("speaker")
+        print(speaker)
         speaker <- str_replace_all(speaker, "\\t+", "")
         return(speaker)
     }
@@ -54,10 +64,15 @@ extract_speaker_data <- function(file_path) {
             regex <- str_c("^([^,]*),", spaces, "*(.*)", spaces, "+-", spaces,
                            "+(.*)$")
             temp3 <- str_match(full_name, regex)
+            
             if (dim(temp3)[2] >= 4) {
                 speaker_name <- if_else(is.na(full_name), full_name, str_trim(temp3[, 2]))
                 speaker_name <- str_trim(speaker_name)
+                print("speaker_name")
+                print(speaker_name)
                 employer <- str_trim(coalesce(temp3[, 3], ""))
+                print("employer")
+                print(employer)
                 role <- str_trim(coalesce(temp3[, 4], ""))
             } else {
                 speaker_name <- NA
@@ -118,12 +133,21 @@ if (!dbExistsTable(pg, c("streetevents", "speaker_data_alt"))) {
             section integer,
         PRIMARY KEY (file_path, speaker_number, context, section));
 
-       CREATE INDEX ON streetevents.speaker_data_alt (file_path);")
+       CREATE INDEX ON streetevents.speaker_data_alt (file_path);
+
+       /* Requirements
+       (1) Be the owner of TABLE
+       (2) Be a direct of indirect member of the new owning role
+       (3) Role must have CREATE priviledge on the table's schema
+       */ 
+       ALTER TABLE streetevents.speaker_data_alt OWNER TO streetevents;")
 }
 
 if (!dbExistsTable(pg, c("streetevents", "speaker_data_dupes"))) {
     dbGetQuery(pg, "
-        CREATE TABLE streetevents.speaker_data_dupes (file_path text);")
+        CREATE TABLE streetevents.speaker_data_dupes (file_path text);
+
+        ALTER TABLE streetevents.speaker_data_dupes OWNER TO streetevents;")
 }
 rs <- dbDisconnect(pg)
 
@@ -170,11 +194,17 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
 
     dbWriteTable(pg$con, c("streetevents", "speaker_data_alt"),
                  speaker_data, row.names=FALSE, append=TRUE)
-
+  
+    print(file_path)
+    print(dupes)
     print("Writing dupe data to Postgres")
+    print(file_path)
+    print(dupes)
     file_path <- dupes %>% select(file_path) %>% distinct()
+    print("line186")
     dbWriteTable(pg$con, c("streetevents", "speaker_data_dupes"), file_path,
                  row.names=FALSE, append=TRUE)
+    print("line189")
 }
 
 for (i in 1:1) {
