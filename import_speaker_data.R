@@ -22,7 +22,6 @@ extract_speaker_data <- function(file_path) {
     full_path <- file.path(se_path, file_path)
     if (!file.exists(full_path)) return(NULL)
 
-    print(file_path)
     file_xml <- read_xml(file.path(se_path, file_path), options = "NOENT")
     lines <- xml_text(xml_child(file_xml, search = "/EventStory/Body"))
     lines <- gsub("\\r\\n", "\n", lines, perl = TRUE)
@@ -48,8 +47,7 @@ extract_speaker_data <- function(file_path) {
         speaker <- gsub("\\n", " ", speaker)
         speaker <- gsub("\\s{2,}", " ", speaker)
         speaker <- str_trim(speaker)
-        print("speaker")
-        print(speaker)
+        
         speaker <- str_replace_all(speaker, "\\t+", "")
         return(speaker)
     }
@@ -68,11 +66,9 @@ extract_speaker_data <- function(file_path) {
             if (dim(temp3)[2] >= 4) {
                 speaker_name <- if_else(is.na(full_name), full_name, str_trim(temp3[, 2]))
                 speaker_name <- str_trim(speaker_name)
-                print("speaker_name")
-                print(speaker_name)
+               
                 employer <- str_trim(coalesce(temp3[, 3], ""))
-                print("employer")
-                print(employer)
+              
                 role <- str_trim(coalesce(temp3[, 4], ""))
             } else {
                 speaker_name <- NA
@@ -195,16 +191,10 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
     dbWriteTable(pg$con, c("streetevents", "speaker_data_alt"),
                  speaker_data, row.names=FALSE, append=TRUE)
   
-    print(file_path)
-    print(dupes)
     print("Writing dupe data to Postgres")
-    print(file_path)
-    print(dupes)
     file_path <- dupes %>% select(file_path) %>% distinct()
-    print("line186")
     dbWriteTable(pg$con, c("streetevents", "speaker_data_dupes"), file_path,
                  row.names=FALSE, append=TRUE)
-    print("line189")
 }
 
 for (i in 1:1) {
