@@ -78,8 +78,9 @@ extract_speaker_data <- function(file_path) {
                     role <- NA
                 }
 
-                tibble(file_name, last_update, speaker_name, employer, role, speaker_number)
-            }
+                tibble(file_name, last_update, speaker_name,
+                       employer, role, speaker_number)
+        }
 
         pres <- sections[grepl("^(Presentation|Transcript)\n", sections)]
 
