@@ -1,4 +1,12 @@
 #!/usr/bin/env Rscript
+# set env
+# install.packages("xml2")
+# install.packages("stringr")
+# install.packages("dplyr")
+# install.packages("RPostgreSQL")
+# install.packages("dbplyr")
+# Sys.setenv(PGHOST = "aaz.chicagobooth.edu",PGDATABASE = "postgres",PGUSER = pg_username)
+
 library(xml2)
 library(stringr)
 library(dplyr, warn.conflicts = FALSE)
@@ -78,7 +86,6 @@ extract_speaker_data <- function(file_path) {
                 }
 
                 tibble(file_name, last_update, speaker_name,
-                       employer, role, speaker_number)
             }
 
         pres <- sections[grepl("^(Presentation|Transcript)\n", sections)]
@@ -134,13 +141,15 @@ if (!dbExistsTable(pg, c("streetevents", "speaker_data_new"))) {
            section integer,
         PRIMARY KEY (file_name, last_update, speaker_number, context, section));
 
+       ALTER TABLE streetevents.speaker_data_alt OWNER TO streetevents;
        CREATE INDEX ON streetevents.speaker_data_new (file_name, last_update);")
 }
 
 if (!dbExistsTable(pg, c("streetevents", "speaker_data_dupes_new"))) {
     dbGetQuery(pg, "
         CREATE TABLE streetevents.speaker_data_dupes_new
-               (file_name text, last_update timestamp with time zone);")
+               (file_name text, last_update timestamp with time zone);
+        ALTER TABLE streetevents.speaker_data_dupes OWNER TO streetevents;")
 }
 
 rs <- dbDisconnect(pg)
@@ -196,7 +205,7 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
 
     dbWriteTable(pg, c("streetevents", "speaker_data_new"),
                  speaker_data, row.names=FALSE, append=TRUE)
-
+  
     print("Writing dupe data to Postgres")
     file_path <- dupes %>% select(file_name, last_update) %>% distinct()
     dbWriteTable(pg, c("streetevents", "speaker_data_dupes_new"), file_path,
