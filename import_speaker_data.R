@@ -1,34 +1,14 @@
 #!/usr/bin/env Rscript
 library(xml2)
 library(stringr)
-library(dplyr)
+library(dplyr, warn.conflicts = FALSE)
 library(parallel)
 
-se_path <- file.path(Sys.getenv("EDGAR_DIR"), "uploads")
+se_path <- file.path(Sys.getenv("SE_DIR"))
+Sys.setenv(TZ='GMT')
 
 unescape_xml <- function(str) {
     xml_text(read_html(paste0("<x>", str, "</x>")))
-}
-
-extract_call_data <- function(file_path) {
-    full_path <- file.path(se_path, file_path)
-    if (!file.exists(full_path)) return(NULL)
-
-    file_name <- str_replace(file_path, "\\.xml$", "")
-    file_xml <- read_xml(file.path(se_path, file_path), options = "NOENT")
-    last_update <- as.POSIXct(xml_attr(file_xml, "lastUpdate"),
-                              format="%A, %B %d, %Y at %H:%M:%S%p GMT", tz = "GMT")
-    city <- xml_text(xml_child(file_xml, search = "/city"))
-    company_name <- xml_text(xml_child(file_xml, search = "/companyName"))
-    company_ticker <- xml_text(xml_child(file_xml, search = "/companyTicker"))
-    start_date <- as.POSIXct(xml_text(xml_child(file_xml, search = "/startDate")),
-                             format="%d-%b-%y %H:%M%p GMT", tz = "GMT")
-    company_id <- xml_text(xml_child(file_xml, search = "/companyId"))
-    cusip <- xml_text(xml_child(file_xml, search = "/CUSIP"))
-    sedol <- xml_text(xml_child(file_xml, search = "/SEDOL"))
-    isin <- xml_text(xml_child(file_xml, search = "/ISIN"))
-    tibble(file_path, file_name, last_update, company_name,
-           company_ticker, start_date, company_id, cusip, sedol, isin)
 }
 
 extract_speaker_data <- function(file_path) {
@@ -37,91 +17,101 @@ extract_speaker_data <- function(file_path) {
     if (!file.exists(full_path)) return(NULL)
     file_name <- str_replace(file_path, "\\.xml$", "")
 
-    file_xml <- read_xml(file.path(se_path, file_path), options = "NOENT")
-    last_update <- as.POSIXct(xml_attr(file_xml, "lastUpdate"),
-                              format="%A, %B %d, %Y at %H:%M:%S%p GMT", tz = "GMT")
-    lines <- xml_text(xml_child(file_xml, search = "/EventStory/Body"))
-    lines <- gsub("\\r\\n", "\n", lines, perl = TRUE)
-    lines <- unescape_xml(lines)
+    read_data <- function(se_path, file_path) {
+            file_xml <- read_xml(file.path(se_path, file_path), options = "NOENT")
+            last_update <- as.POSIXct(xml_attr(file_xml, "lastUpdate"),
+                                      format="%A, %B %d, %Y at %H:%M:%S%p GMT", tz = "GMT")
+            lines <- xml_text(xml_child(file_xml, search = "/EventStory/Body"))
+            lines <- gsub("\\r\\n", "\n", lines, perl = TRUE)
+            lines <- unescape_xml(lines)
 
-    sections <- str_split(lines, "==={3,}\n")[[1]]
+            sections <- str_split(lines, "==={3,}\n")[[1]]
 
-    analyze_text <- function(section_text) {
-        values <- str_split(section_text, "\n---{3,}")
-        text <- str_trim(values[[1]])
-        num_speakers <- (length(text) - 1)/2
-        speaker_data <- text[seq(from = 2, length.out = num_speakers, by = 2)]
-        speaker_text <- text[seq(from = 3, length.out = num_speakers, by = 2)]
-        speaker <- clean_speaker(speaker_data)
-        bind_cols(extract_speaker(speaker), tibble(speaker_text))
-    }
-
-    analyze_text_wrap <- function(sections) {
-        bind_rows(lapply(sections, analyze_text), .id="section")
-    }
-
-    clean_speaker <- function(speaker) {
-        speaker <- gsub("\\n", " ", speaker)
-        speaker <- gsub("\\s{2,}", " ", speaker)
-        speaker <- str_trim(speaker)
-        speaker <- str_replace_all(speaker, "\\t+", "")
-        return(speaker)
-    }
-
-    extract_speaker <- function(speaker) {
-        temp2 <- str_match(speaker, "^(.*)\\s+\\[(\\d+)\\]")
-        if (dim(temp2)[2] >= 3) {
-            speaker_number <- temp2[, 3]
-            full_name <- temp2[, 2]
-
-            spaces <- "[\\s\\p{WHITE_SPACE}\u3000\ua0]"
-            regex <- str_c("^([^,]*),", spaces, "*(.*)", spaces, "+-", spaces,
-                           "+(.*)$")
-            temp3 <- str_match(full_name, regex)
-            if (dim(temp3)[2] >= 4) {
-                speaker_name <- if_else(is.na(full_name), full_name, str_trim(temp3[, 2]))
-                speaker_name <- str_trim(speaker_name)
-                employer <- str_trim(coalesce(temp3[, 3], ""))
-                role <- str_trim(coalesce(temp3[, 4], ""))
-            } else {
-                speaker_name <- NA
-                employer <- NA
-                role <- NA
+            analyze_text <- function(section_text) {
+                values <- str_split(section_text, "\n---{3,}")
+                text <- str_trim(values[[1]])
+                num_speakers <- (length(text) - 1)/2
+                speaker_data <- text[seq(from = 2, length.out = num_speakers, by = 2)]
+                speaker_text <- text[seq(from = 3, length.out = num_speakers, by = 2)]
+                speaker <- clean_speaker(speaker_data)
+                bind_cols(extract_speaker(speaker), tibble(speaker_text))
             }
+
+            analyze_text_wrap <- function(sections) {
+                bind_rows(lapply(sections, analyze_text), .id="section")
+            }
+
+            clean_speaker <- function(speaker) {
+                speaker <- gsub("\\n", " ", speaker)
+                speaker <- gsub("\\s{2,}", " ", speaker)
+                speaker <- str_trim(speaker)
+                speaker <- str_replace_all(speaker, "\\t+", "")
+                return(speaker)
+            }
+
+            extract_speaker <- function(speaker) {
+                temp2 <- str_match(speaker, "^(.*)\\s+\\[(\\d+)\\]")
+                if (dim(temp2)[2] >= 3) {
+                    speaker_number <- temp2[, 3]
+                    full_name <- temp2[, 2]
+
+                    spaces <- "[\\s\\p{WHITE_SPACE}\u3000\ua0]"
+                    regex <- str_c("^([^,]*),", spaces, "*(.*)", spaces, "+-", spaces,
+                                   "+(.*)$")
+                    temp3 <- str_match(full_name, regex)
+                    if (dim(temp3)[2] >= 4) {
+                        speaker_name <- if_else(is.na(full_name), full_name,
+                                                str_trim(temp3[, 2]))
+                        speaker_name <- str_trim(speaker_name)
+                        employer <- str_trim(coalesce(temp3[, 3], ""))
+                        role <- str_trim(coalesce(temp3[, 4], ""))
+                    } else {
+                        speaker_name <- NA
+                        employer <- NA
+                        role <- NA
+                    }
+                } else {
+                    speaker_number <- NA
+                    speaker_name <- NA
+                    employer <- NA
+                    role <- NA
+                }
+
+                tibble(file_name, last_update, speaker_name,
+                       employer, role, speaker_number)
+            }
+
+        pres <- sections[grepl("^(Presentation|Transcript)\n", sections)]
+
+        if (length(pres) > 0) {
+            pres_df <-
+                analyze_text_wrap(pres) %>%
+                mutate(context = "pres") %>%
+                select(file_name, last_update, speaker_name, employer, role,
+                       speaker_number, speaker_text, context, section)
         } else {
-            speaker_number <- NA
-            speaker_name <- NA
-            employer <- NA
-            role <- NA
+            return(NULL)
         }
 
-        tibble(file_name, last_update, speaker_name, employer, role, speaker_number)
+        qa <- sections[grepl("^(Questions and Answers|q and a)", sections)]
+
+        if (length(qa) > 0) {
+            qa_df <-
+                analyze_text_wrap(qa) %>%
+                mutate(context = "qa") %>%
+                select(file_name, last_update, speaker_name, employer, role,
+                       speaker_number, speaker_text, context, section)
+            return(bind_rows(pres_df, qa_df))
+        } else {
+            return(pres_df)
+        }
     }
 
-    pres <- sections[grepl("^(Presentation|Transcript)\n", sections)]
+    empty_df <- tibble(file_name)
 
-    if (length(pres) > 0) {
-        pres_df <-
-            analyze_text_wrap(pres) %>%
-            mutate(context = "pres") %>%
-            select(file_name, last_update, speaker_name, employer, role,
-                   speaker_number, speaker_text, context, section)
-    } else {
-        return(NULL)
-    }
-
-    qa <- sections[grepl("^(Questions and Answers|q and a)", sections)]
-
-    if (length(qa) > 0) {
-        qa_df <-
-            analyze_text_wrap(qa) %>%
-            mutate(context = "qa") %>%
-            select(file_name, last_update, speaker_name, employer, role,
-                   speaker_number, speaker_text, context, section)
-        return(bind_rows(pres_df, qa_df))
-    } else {
-        return(pres_df)
-    }
+    file_data <- try(read_data(se_path, file_path))
+    if (is.error(file_data)) return(empty_df)
+    return(file_data)
 }
 
 # Get a list of files that need to be processed ----
@@ -149,48 +139,25 @@ if (!dbExistsTable(pg, c("streetevents", "speaker_data_new"))) {
 
 if (!dbExistsTable(pg, c("streetevents", "speaker_data_dupes_new"))) {
     dbGetQuery(pg, "
-        CREATE TABLE streetevents.speaker_data_dupes_new (file_name text, last_update timestamp with time zone);")
+        CREATE TABLE streetevents.speaker_data_dupes_new
+               (file_name text, last_update timestamp with time zone);")
 }
 
 rs <- dbDisconnect(pg)
 
-if (FALSE) {
-    library(RPostgreSQL)
-    pg <- dbConnect(PostgreSQL())
-    call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
-    file_list <-
-        call_files %>%
-        select(file_path) %>%
-        pull()
-    library(parallel)
-    calls <- bind_rows(mclapply(file_list, extract_call_data, mc.cores = 12))
-
-    rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
-
-    rs <- dbWriteTable(pg, c("streetevents", "calls_new"), calls,
-                       overwrite = TRUE, row.names = FALSE)
-
-    rs <- dbGetQuery(pg, "ALTER TABLE streetevents.calls_new OWNER TO streetevents")
-
-    rs <- dbGetQuery(pg, "GRANT SELECT ON TABLE streetevents.calls_new TO streetevents_access")
-
-    rs <- dbDisconnect(pg)
-}
-
-
 process_calls <- function(num_calls = 1000, file_list = NULL) {
     pg <- dbConnect(PostgreSQL())
 
-    call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
+    # call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
     calls <- tbl(pg, sql("SELECT * FROM streetevents.calls_new"))
     speaker_data <- tbl(pg, sql("SELECT * FROM streetevents.speaker_data_new"))
-    speaker_data_dupes <- tbl(pg, sql("SELECT * FROM streetevents.speaker_data_dupes_new"))
+    speaker_data_dupes <-
+        tbl(pg, sql("SELECT * FROM streetevents.speaker_data_dupes_new"))
 
     if (is.null(file_list)) {
 
         file_list <-
-            call_files %>%
-            inner_join(calls, by = "file_path") %>%
+            calls %>%
             select(file_path, file_name, last_update) %>%
             distinct() %>%
             arrange(random()) %>%
@@ -198,11 +165,13 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
             anti_join(speaker_data_dupes, by = c("file_name", "last_update")) %>%
             collect(n=num_calls)
     }
+    temp <- mclapply(file_list$file_path, extract_speaker_data, mc.cores=12)
 
-    library(parallel)
+    print(length(temp ))
     speaker_data <-
-        bind_rows(mclapply(file_list$file_path, extract_speaker_data, mc.cores=12)) %>%
+        bind_rows(temp) %>%
         filter(speaker_text != "")
+
     print(sprintf("Speaker data has %d rows", nrow(speaker_data)))
 
     if (nrow(speaker_data) == 0) {
@@ -233,9 +202,9 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
     dbWriteTable(pg, c("streetevents", "speaker_data_dupes_new"), file_path,
                  row.names=FALSE, append=TRUE)
     rs <- dbDisconnect(pg)
+    return(nrow(file_list)>0)
 }
 
-for (i in 1:80) {
-    tm <- system.time(process_calls(num_calls = 4000))
+system.time(while(tm <- process_calls(num_calls = 4000)) {
     print(tm)
-}
+})

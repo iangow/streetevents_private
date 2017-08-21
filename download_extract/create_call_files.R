@@ -5,110 +5,109 @@
 
 # Set up stuff ----
 library(parallel)
-library(dplyr)
+library(dplyr, warn.conflicts = FALSE)
+library(RPostgreSQL)
+
 getSHA1 <- function(file_name) {
     library("digest")
     digest(file=file_name, algo="sha1")
 }
 
 # Get a list of files ----
-streetevent.dir <- file.path(Sys.getenv("EDGAR_DIR"), "uploads")
-full_path <- list.files(streetevent.dir,
-                   pattern="*_T.xml", recursive = TRUE,
-                   include.dirs=FALSE, full.names = TRUE)
+streetevent.dir <- file.path(Sys.getenv("SE_DIR"))
+Sys.setenv(TZ='GMT')
+
+full_path <- list.files(streetevent.dir, pattern="*_T.xml", recursive = TRUE,
+                        include.dirs=FALSE, full.names = TRUE)
 
 file_list <-
     data_frame(full_path) %>%
-    mutate(mtime = as.character(as.POSIXlt(file.mtime(full_path), tz="UTC")),
-           file_path = gsub(paste0(streetevent.dir, "/"), "", full_path,
-                            fixed = TRUE))
+    mutate(mtime = as.POSIXct(file.mtime(full_path)),
+                 file_path = gsub(paste0(streetevent.dir, "/"), "", full_path,
+                                                    fixed = TRUE))
 
-library("RPostgreSQL")
 pg <- dbConnect(PostgreSQL())
-
+rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
 new_table <- !dbExistsTable(pg, c("streetevents", "call_files"))
 
 if (!new_table) {
+
     rs <- dbWriteTable(pg, c("streetevents", "call_files_temp"),
-                       file_list %>%
-                           select(file_path, mtime),
+                       file_list %>% select(file_path, mtime),
                        overwrite=TRUE, row.names=FALSE)
-    dbGetQuery(pg, "
+
+    rs <- dbGetQuery(pg, "
         CREATE INDEX ON streetevents.call_files_temp (file_path, mtime)")
-    dbDisconnect(pg)
 
-    pg <- src_postgres()
-
-    new_files <- tbl(pg, sql("
-        SELECT file_path, mtime
-        FROM streetevents.call_files_temp
-        EXCEPT
-        SELECT file_path,
-            (mtime AT TIME ZONE 'UTC')::text AS mtime
-        FROM streetevents.call_files")) %>%
-        collect()
-
-    if (dim(new_files)[1]>0) {
-        new_files <-
-            new_files %>%
-            inner_join(file.list %>% mutate(mtime = as.character(mtime)))
-    }
-} else {
-    new_files <- file_list
-}
-
-# Process files ----
-if (dim(new_files)[1]>0) {
-    file_info <-
-        file.info(new_files$full_path ) %>%
-        as_data_frame() %>%
-        transmute(file_size = size,
-                  ctime = as.character(as.POSIXlt(ctime, tz="UTC")))
+    call_files_temp <- tbl(pg, sql("SELECT * FROM streetevents.call_files_temp"))
+    call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
 
     new_files <-
-        bind_cols(new_files, file_info) %>%
+        call_files_temp %>%
+        select(file_path, mtime) %>%
+        anti_join(call_files) %>%
+        collect()
+
+    rs <- dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.call_files_temp")
+
+    if (dim(new_files)[1]>0) {
+        new_files_plus <-
+            new_files %>%
+            inner_join(file_list %>% select(-mtime))
+    } else {
+        new_files_plus <- tibble()
+    }
+} else {
+    new_files_plus <- file_list
+}
+
+rs <- dbDisconnect(pg)
+
+process_rows <- function(df) {
+    file_info <-
+        file.info(df$full_path) %>%
+        as_data_frame() %>%
+        transmute(file_size = size,
+                  ctime = as.POSIXct(ctime))
+
+    new_files_plus2 <-
+        bind_cols(df, file_info) %>%
         mutate(file_name = gsub("\\.xml", "", basename(file_path))) %>%
         rowwise() %>%
         mutate(sha1 = getSHA1(full_path)) %>%
         select(file_path, file_size, mtime, ctime, file_name, sha1) %>%
-        as.data.frame()
+        ungroup() %>%
+        as_tibble()
 
-    if (!new_table) {
-        pg <- dbConnect(PostgreSQL())
-        rs <- dbWriteTable(pg, c("streetevents", "call_files_new"),
-                           new_files,
-                           append=TRUE, row.names=FALSE)
-        dbGetQuery(pg, "
-            ALTER TABLE streetevents.call_files_new
-            ALTER mtime TYPE timestamp with time zone
-            USING mtime::timestamp without time zone AT TIME ZONE 'UTC'")
+    pg <- dbConnect(PostgreSQL())
+    rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
 
-        dbGetQuery(pg, "
-            ALTER TABLE streetevents.call_files_new
-            ALTER ctime TYPE timestamp with time zone
-            USING ctime::timestamp without time zone AT TIME ZONE 'UTC'")
+    if (dbExistsTable(pg, c("streetevents", "call_files"))) {
+        rs <- dbWriteTable(pg, c("streetevents", "call_files"),
+                   new_files_plus2 %>% as.data.frame(),
+                   append=TRUE, row.names=FALSE)
+    } else {
+        rs <- dbWriteTable(pg, c("streetevents", "call_files"),
+                           new_files_plus2 %>% as.data.frame(), row.names=FALSE)
 
-        dbGetQuery(pg, "INSERT INTO streetevents.call_files
-            SELECT file_path, file_size, mtime, ctime, file_name, sha1
-            FROM streetevents.call_files_new")
-
-        dbGetQuery(pg, "DROP TABLE streetevents.call_files_temp")
-        dbGetQuery(pg, "DROP TABLE streetevents.call_files_new")
-        dbDisconnect(pg)
-    }
-
-    if (new_table) {
-        pg <- dbConnect(PostgreSQL())
-        rs <- dbWriteTable(pg, c("streetevents", "call_files"), new_files,
-                           overwrite=TRUE, row.names=FALSE)
-        dbGetQuery(pg, "
-            ALTER TABLE streetevents.call_files
-            ALTER mtime TYPE timestamp with time zone
-            USING mtime::timestamp without time zone AT TIME ZONE 'UTC'")
-
-        dbGetQuery(pg, "
+        rs <- dbGetQuery(pg, "
             SET maintenance_work_mem='2GB';
             CREATE INDEX ON streetevents.call_files (file_path)")
-        rs <- dbDisconnect(pg)
     }
+
+    dbDisconnect(pg)
+}
+
+split_df <- function(df, n = 10) {
+    nrow <- nrow(df)
+    r  <- rep(1:(n+1), each=nrow/n)[1:nrow]
+    split(df, r)
+}
+
+# Process files ----
+if (dim(new_files_plus)[1]>0) {
+
+    new_file_dfs <- split_df(new_files_plus, n = 1000)
+
+    rs <- lapply(new_file_dfs, process_rows)
 }
