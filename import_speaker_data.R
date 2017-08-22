@@ -135,7 +135,7 @@ if (!dbExistsTable(pg, c("streetevents", "speaker_data"))) {
            section integer,
         PRIMARY KEY (file_name, last_update, speaker_number, context, section));
 
-       ALTER TABLE streetevents.speaker_data_alt OWNER TO streetevents;
+       ALTER TABLE streetevents.speaker_data OWNER TO streetevents;
        CREATE INDEX ON streetevents.speaker_data (file_name, last_update);")
 }
 
