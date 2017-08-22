@@ -100,6 +100,7 @@ process_rows <- function(df) {
 
 split_df <- function(df, n = 10) {
     nrow <- nrow(df)
+    if (nrow <= n) return(list(df))
     r  <- rep(1:(n+1), each=nrow/n)[1:nrow]
     split(df, r)
 }
