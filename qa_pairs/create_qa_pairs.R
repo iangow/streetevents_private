@@ -16,8 +16,10 @@ if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
         );
 
         CREATE INDEX ON streetevents.qa_pairs (file_name, last_update);
+        ALTER TABLE streetevents.qa_pairs OWNER TO streetevents;
+        GRANT SELECT ON streetevents.qa_pairs TO streetevents_access;
 
-        GRANT SELECT ON streetevents.qa_pairs TO personality_access;")
+        GRANT SELECT ON streetevents.qa_pairs TO streetevents_access;")
 }
 
 rs <- dbDisconnect(pg)
