@@ -33,7 +33,7 @@ qa_pairs <- tbl(pg, sql("SELECT * FROM streetevents.qa_pairs"))
 
 file_list <-
     calls %>%
-    filter(call_type == 1L) %>%
+    filter(event_type == 1L) %>%
     select(file_name, last_update) %>%
     anti_join(qa_pairs) %>%
     collect(n = Inf)

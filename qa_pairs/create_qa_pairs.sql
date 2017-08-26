@@ -3,7 +3,7 @@ DELETE FROM streetevents.qa_pairs WHERE file_name='%s';
 INSERT INTO streetevents.qa_pairs (file_name, last_update, question_nums, answer_nums)
 
 WITH sample_transcripts AS (
-    SELECT a.file_name, a.last_update,
+    SELECT a.file_name, a.last_update, a.section,
         a.speaker_name, a.speaker_number,
         trim(a.speaker_text) AS speaker_text, a.role,
         role != 'Analyst' AS is_answer,
@@ -11,7 +11,8 @@ WITH sample_transcripts AS (
     FROM streetevents.speaker_data AS a
     INNER JOIN streetevents.calls
     USING (file_name, last_update)
-    WHERE call_type=1 AND context='qa' AND speaker_name != 'Operator'
+    WHERE event_type=1 AND context='qa' AND speaker_name != 'Operator'
+        AND section = 1
         AND file_name='%s'
     ORDER BY file_name, last_update, speaker_number),
 
