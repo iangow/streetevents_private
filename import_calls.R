@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript
+
 library(RPostgreSQL)
 library(dplyr, warn.conflicts = FALSE)
 library(xml2)
