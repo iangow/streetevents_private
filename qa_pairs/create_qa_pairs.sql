@@ -18,8 +18,8 @@ WITH sample_transcripts AS (
 grouped AS (
    SELECT *,
       sum(is_question::integer) OVER all_obs AS question_group
-      FROM sample_transcripts
-      WINDOW all_obs AS (PARTITION BY file_name, last_update ORDER BY speaker_number)),
+   FROM sample_transcripts
+   WINDOW all_obs AS (PARTITION BY file_name, last_update ORDER BY speaker_number)),
 
 questions_raw AS (
     SELECT file_name, last_update, question_group,
