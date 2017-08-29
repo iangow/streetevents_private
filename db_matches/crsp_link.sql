@@ -9,12 +9,11 @@ CREATE TABLE streetevents.crsp_link AS
 WITH
 
 calls AS (
-    SELECT streetevents.clean_tickers(ticker) AS ticker, file_name,
-        co_name, call_date::date
+    SELECT streetevents.clean_tickers(company_ticker) AS ticker, file_name,
+        company_name AS co_name, start_date::date AS call_date
     FROM streetevents.calls
-    WHERE (ticker ~ '\.A$' OR ticker !~ '\.[A-Z]+$')
-        AND ticker IS NOT NULL -- AND call_type = 1
-),
+    WHERE (company_ticker ~ '\.A$' OR company_ticker !~ '\.[A-Z]+$')
+        AND company_ticker IS NOT NULL),
 
 match0 AS (
     SELECT DISTINCT a.file_name, a.ticker, COALESCE(b.co_name, a.co_name) AS co_name,
@@ -205,7 +204,8 @@ SELECT file_name, permno,
 FROM all_matches
 ORDER BY file_name;
 
-ALTER TABLE streetevents.crsp_link OWNER TO personality_access;
+ALTER TABLE streetevents.crsp_link OWNER TO streetevents;
+GRANT SELECT ON streetevents.crsp_link TO streetevents_access;
 
 CREATE INDEX ON streetevents.crsp_link (file_name);
 
