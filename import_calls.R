@@ -5,6 +5,7 @@ library(dplyr, warn.conflicts = FALSE)
 library(xml2)
 library(parallel)
 library(stringr)
+Sys.setenv(SE_DIR="/Volumes/2TB/data/streetevents_project")
 se_path <- file.path(Sys.getenv("SE_DIR"))
 
 getSHA1 <- function(file_name) {
@@ -54,9 +55,9 @@ extract_call_data <- function(file_path) {
 
 pg <- dbConnect(PostgreSQL())
 
-if (!dbExistsTable(pg, c("streetevents", "calls"))) {
+if (!dbExistsTable(pg, c("streetevents", "calls_hbs"))) {
     dbGetQuery(pg, "
-        CREATE TABLE streetevents.calls
+        CREATE TABLE streetevents.calls_hbs
             (
               file_path text,
               sha1 text,
@@ -75,22 +76,22 @@ if (!dbExistsTable(pg, c("streetevents", "calls"))) {
               city text
             );
 
-        CREATE INDEX ON streetevents.calls (file_name, last_update);
-        CREATE INDEX ON streetevents.calls (file_path, sha1);
-        CREATE INDEX ON streetevents.calls (file_path);
+        CREATE INDEX ON streetevents.calls_hbs (file_name, last_update);
+        CREATE INDEX ON streetevents.calls_hbs (file_path, sha1);
+        CREATE INDEX ON streetevents.calls_hbs (file_path);
 
-        ALTER TABLE streetevents.calls OWNER TO streetevents;
+        ALTER TABLE streetevents.calls_hbs OWNER TO streetevents;
 
-        GRANT SELECT ON TABLE streetevents.calls TO streetevents_access;")
+        GRANT SELECT ON TABLE streetevents.calls_hbs TO streetevents_access;")
 }
 rs <- dbDisconnect(pg)
 Sys.setenv(TZ='GMT')
 
 pg <- dbConnect(PostgreSQL())
 
-call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
+call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files_hbs"))
 
-calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
+calls <- tbl(pg, sql("SELECT * FROM streetevents.calls_hbs"))
 
 get_file_list <- function() {
     df <-
@@ -106,11 +107,11 @@ get_file_list <- function() {
 while (length(file_list <- get_file_list()) > 0) {
 
     calls_new <- bind_rows(mclapply(file_list,
-                                    extract_call_data, mc.cores = 24))
+                                    extract_call_data, mc.cores = 12))
 
     rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
     if (nrow(calls_new) > 0) {
-        rs <- dbWriteTable(pg, c("streetevents", "calls"), calls_new,
+        rs <- dbWriteTable(pg, c("streetevents", "calls_hbs"), calls_new,
                        append = TRUE, row.names = FALSE)
     }
 }

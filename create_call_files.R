@@ -14,6 +14,7 @@ getSHA1 <- function(file_name) {
 }
 
 # Get a list of files ----
+Sys.setenv(SE_DIR="/Volumes/2TB/data/streetevents_project")
 streetevent.dir <- file.path(Sys.getenv("SE_DIR"))
 Sys.setenv(TZ='GMT')
 
@@ -28,27 +29,27 @@ file_list <-
 
 pg <- dbConnect(PostgreSQL())
 rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
-new_table <- !dbExistsTable(pg, c("streetevents", "call_files"))
+new_table <- !dbExistsTable(pg, c("streetevents", "call_files_hbs"))
 
 if (!new_table) {
 
-    rs <- dbWriteTable(pg, c("streetevents", "call_files_temp"),
+    rs <- dbWriteTable(pg, c("streetevents", "call_files_hbs_temp"),
                        file_list %>% select(file_path, mtime),
                        overwrite=TRUE, row.names=FALSE)
 
     rs <- dbGetQuery(pg, "
-        CREATE INDEX ON streetevents.call_files_temp (file_path, mtime)")
+        CREATE INDEX ON streetevents.call_files_hbs_temp (file_path, mtime)")
 
-    call_files_temp <- tbl(pg, sql("SELECT * FROM streetevents.call_files_temp"))
-    call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
+    call_files_hbs_temp <- tbl(pg, sql("SELECT * FROM streetevents.call_files_hbs_temp"))
+    call_files_hbs <- tbl(pg, sql("SELECT * FROM streetevents.call_files_hbs"))
 
     new_files <-
-        call_files_temp %>%
+        call_files_hbs_temp %>%
         select(file_path, mtime) %>%
-        anti_join(call_files) %>%
+        anti_join(call_files_hbs) %>%
         collect()
 
-    rs <- dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.call_files_temp")
+    rs <- dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.call_files_hbs_temp")
 
     if (dim(new_files)[1]>0) {
         new_files_plus <-
@@ -82,17 +83,17 @@ process_rows <- function(df) {
     pg <- dbConnect(PostgreSQL())
     rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
 
-    if (dbExistsTable(pg, c("streetevents", "call_files"))) {
-        rs <- dbWriteTable(pg, c("streetevents", "call_files"),
+    if (dbExistsTable(pg, c("streetevents", "call_files_hbs"))) {
+        rs <- dbWriteTable(pg, c("streetevents", "call_files_hbs"),
                    new_files_plus2 %>% as.data.frame(),
                    append=TRUE, row.names=FALSE)
     } else {
-        rs <- dbWriteTable(pg, c("streetevents", "call_files"),
+        rs <- dbWriteTable(pg, c("streetevents", "call_files_hbs"),
                            new_files_plus2 %>% as.data.frame(), row.names=FALSE)
 
         rs <- dbGetQuery(pg, "
             SET maintenance_work_mem='2GB';
-            CREATE INDEX ON streetevents.call_files (file_path)")
+            CREATE INDEX ON streetevents.call_files_hbs (file_path)")
     }
 
     dbDisconnect(pg)
