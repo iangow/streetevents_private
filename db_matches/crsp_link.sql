@@ -8,12 +8,30 @@ DROP TABLE IF EXISTS streetevents.crsp_link;
 CREATE TABLE streetevents.crsp_link AS
 WITH
 
+calls_combined AS (
+    SELECT file_name, company_name, start_date, company_ticker, last_update
+    FROM streetevents.calls
+    UNION
+    SELECT file_name, company_name, start_date, company_ticker, last_update
+    FROM streetevents.calls_hbs),
+
+earliest_calls AS (
+    SELECT file_name, min(last_update) AS last_update
+    FROM calls_combined
+    WHERE (company_ticker ~ '\.A$' OR company_ticker !~ '\.[A-Z]+$')
+        AND company_ticker IS NOT NULL
+    GROUP BY file_name),
+
+earliest_calls_merged AS (
+    SELECT *
+    FROM calls_combined
+    INNER JOIN earliest_calls
+    USING (file_name, last_update)),
+
 calls AS (
     SELECT streetevents.clean_tickers(company_ticker) AS ticker, file_name,
         company_name AS co_name, start_date::date AS call_date
-    FROM streetevents.calls
-    WHERE (company_ticker ~ '\.A$' OR company_ticker !~ '\.[A-Z]+$')
-        AND company_ticker IS NOT NULL),
+    FROM earliest_calls_merged),
 
 match0 AS (
     SELECT DISTINCT a.file_name, a.ticker, COALESCE(b.co_name, a.co_name) AS co_name,
