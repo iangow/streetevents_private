@@ -77,6 +77,7 @@ if (!dbExistsTable(pg, c("streetevents", "calls"))) {
 
         CREATE INDEX ON streetevents.calls (file_name, last_update);
         CREATE INDEX ON streetevents.calls (file_path, sha1);
+        CREATE INDEX ON streetevents.calls (file_path);
 
         ALTER TABLE streetevents.calls OWNER TO streetevents;
 
