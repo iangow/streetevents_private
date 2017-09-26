@@ -10,7 +10,7 @@ if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
         CREATE TABLE streetevents.qa_pairs
         (
           file_name text,
-          last_update timestamp without time zone,
+          last_update timestamp with time zone,
           answer_nums integer[],
           question_nums integer[]
         );

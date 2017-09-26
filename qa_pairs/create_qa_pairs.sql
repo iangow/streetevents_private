@@ -28,7 +28,7 @@ questions_raw AS (
       array_agg(speaker_number ORDER BY speaker_number) AS speaker_numbers,
       bool_or(is_question) AS is_question
     FROM grouped
-    WHERE role='Analyst'
+    WHERE role ~ 'Analyst'
     GROUP BY file_name, last_update, question_group, speaker_name),
 
 questions_inter AS (
