@@ -32,36 +32,32 @@ calls %>%
 
 ```{r call_date, message=FALSE, fig.cap="Histogram of `call_date` on `calls`"}
 calls %>%
-    filter(file_path ~ 'Jun2016') %>%
     mutate(call_month=date_trunc('month', call_date)) %>%
     select(call_month) %>%
-    as.data.frame() %>%
+    collect() %>%
     ggplot(aes(x=call_month)) +
     geom_histogram()
 ```
 
 ```{r last_update, message=FALSE, fig.cap="Histogram of `last_update` on `calls`"}
 calls %>%
-    filter(file_path ~ 'Jun2016') %>%
-    as.data.frame() %>%
+    collect() %>%
     ggplot(aes(x=last_update)) +
     geom_histogram()
 ```
 
 ```{r last_update_speaker, message=FALSE, fig.cap="Histogram of `last_update` on `speaker_data`"}
 speaker_data %>%
-    filter(last_update > '2016-05-31') %>%
     select(file_name, last_update) %>%
     distinct() %>%
-    as.data.frame() %>%
+    collect() %>%
     ggplot(aes(x=last_update)) +
     geom_histogram()
 ```
 
 ```{r mtime, message=FALSE, fig.cap="Histogram of `mtime` on `call_files`"}
 call_files %>%
-    filter(file_path ~ 'Jun2016') %>%
-    as.data.frame() %>%
+    collect() %>%
     ggplot(aes(x=mtime)) +
     geom_histogram()
 ```
