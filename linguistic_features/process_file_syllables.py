@@ -7,6 +7,7 @@ the_table = "syllable_data"
 the_schema = "streetevents"
 
 from syllable_count import syllable_data
+import pandas as pd
 
 def processFile(file_name):
 
@@ -44,6 +45,6 @@ def getQuestionData(file_name):
         """ % (file_name)
 
     df = read_sql(sql, engine)
-
+    df['last_update'] =  df['last_update'].apply(lambda d: pd.to_datetime(str(d)))
     return df
 

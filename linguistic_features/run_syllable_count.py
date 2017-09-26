@@ -27,7 +27,7 @@ def getFileNames(the_table, the_schema, num_files=None):
             WITH latest_call AS (
                 SELECT file_name, last_update
                 FROM streetevents.calls
-                WHERE call_type=1)
+                WHERE event_type=1)
             SELECT file_name, last_update
             FROM latest_call
             EXCEPT
@@ -40,7 +40,7 @@ def getFileNames(the_table, the_schema, num_files=None):
         sql = """CREATE TABLE %s.%s
                 (
                     file_name text,
-                    last_update timestamp without time zone,
+                    last_update timestamp with time zone,
                     context text,
                     speaker_number integer,
                     syllable_data jsonb)
