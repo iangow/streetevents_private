@@ -8,6 +8,8 @@ library(parallel)
 se_path <- file.path(Sys.getenv("SE_DIR"))
 Sys.setenv(TZ='GMT')
 
+is.error <- function(x) inherits(x, "try-error")
+
 unescape_xml <- function(str) {
     xml_text(read_html(paste0("<x>", str, "</x>")))
 }
