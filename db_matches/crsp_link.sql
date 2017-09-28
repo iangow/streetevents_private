@@ -9,11 +9,13 @@ CREATE TABLE se_stage.crsp_link AS
 WITH
 
 calls_combined AS (
-    SELECT file_name, company_name, start_date, company_ticker, last_update
-    FROM se_stage.calls
-    UNION
-    SELECT file_name, company_name, start_date, company_ticker, last_update
-    FROM se_stage.calls_hbs),
+    SELECT file_name, last_update,
+        COALESCE(b.company_name, a.company_name) AS company_name,
+        COALESCE(b.start_date, a.start_date) AS start_date,
+        COALESCE(b.company_ticker, a.company_ticker) AS company_ticker
+    FROM se_stage.calls AS a
+    FULL OUTER JOIN se_stage.calls_hbs AS b
+    USING (file_name, last_update)),
 
 earliest_calls AS (
     SELECT file_name, min(last_update) AS last_update
