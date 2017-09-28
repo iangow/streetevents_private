@@ -26,27 +26,27 @@ pg_comment <- function(table, comment) {
 library(RPostgreSQL)
 pg <- dbConnect(PostgreSQL())
 
-rs <- dbWriteTable(pg, c("streetevents", "manual_permno_matches"),
+rs <- dbWriteTable(pg, c("se_stage", "manual_permno_matches"),
                    permnos,
                    overwrite=TRUE, row.names=FALSE)
 
 rs <- dbGetQuery(pg, "
-    ALTER TABLE streetevents.manual_permno_matches
+    ALTER TABLE se_stage.manual_permno_matches
     OWNER TO streetevents_access")
 
 rs <- dbGetQuery(pg,
-    "DELETE FROM streetevents.manual_permno_matches
+    "DELETE FROM se_stage.manual_permno_matches
     WHERE file_name IN (
         SELECT file_name
-        FROM streetevents.manual_permno_matches
+        FROM se_stage.manual_permno_matches
         GROUP BY file_name
         HAVING count(DISTINCT permno)>1)
             AND comment != 'Fix by Nastia/Vincent in January 2015';
 
-    CREATE INDEX ON streetevents.manual_permno_matches (file_name);
+    CREATE INDEX ON se_stage.manual_permno_matches (file_name);
 ")
 
 rs <- dbDisconnect(pg)
 
-rs <- pg_comment("streetevents.manual_permno_matches",
+rs <- pg_comment("se_stage.manual_permno_matches",
            paste0("CREATED USING import_manual_permno_matches.R ON ", Sys.time()))

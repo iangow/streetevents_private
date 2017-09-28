@@ -1,19 +1,19 @@
 /*******************************
-OBJECTIVE: Match streetevents.calls with PERMNOs from crsp.stocknames
+OBJECTIVE: Match se_stage.calls with PERMNOs from crsp.stocknames
 *******************************/
-DROP VIEW IF EXISTS streetevents.company_link;
+DROP VIEW IF EXISTS se_stage.company_link;
 
-DROP TABLE IF EXISTS streetevents.crsp_link;
+DROP TABLE IF EXISTS se_stage.crsp_link;
 
-CREATE TABLE streetevents.crsp_link AS
+CREATE TABLE se_stage.crsp_link AS
 WITH
 
 calls_combined AS (
     SELECT file_name, company_name, start_date, company_ticker, last_update
-    FROM streetevents.calls
+    FROM se_stage.calls
     UNION
     SELECT file_name, company_name, start_date, company_ticker, last_update
-    FROM streetevents.calls_hbs),
+    FROM se_stage.calls_hbs),
 
 earliest_calls AS (
     SELECT file_name, min(last_update) AS last_update
@@ -38,7 +38,7 @@ match0 AS (
         a.call_date, b.permno,
         '0. Manual matches'::text AS match_type_desc
     FROM calls AS a
-    LEFT JOIN streetevents.manual_permno_matches AS b
+    LEFT JOIN se_stage.manual_permno_matches AS b
     ON a.file_name=b.file_name),
 
 match1 AS (
@@ -61,7 +61,7 @@ match1 AS (
     93387    "2010-05-18"   "2010-06-22"    "CODE"    "2010-05-28"    "2013-06-28"
     93387    "2010-06-23"   "2013-06-28"    "CODE"    "2010-05-28"    "2013-06-28"
 
-    In StreetEvents, SPANSION ticker is only CODE from 2006-2013
+    In se_stage, SPANSION ticker is only CODE from 2006-2013
 */
 roll_match1 AS (
     SELECT DISTINCT co_name, ticker, permno
@@ -70,7 +70,7 @@ roll_match1 AS (
 
 match2 AS (
     SELECT a.file_name, a.ticker, a.co_name, a.call_date, b.permno,
-        '2. Roll matches back & forward in StreetEvents'::text AS match_type_desc
+        '2. Roll matches back & forward in se_stage'::text AS match_type_desc
     FROM match1 AS a
     LEFT JOIN roll_match1 AS b
     USING (ticker, co_name)
@@ -222,9 +222,9 @@ SELECT file_name, permno,
 FROM all_matches
 ORDER BY file_name;
 
-ALTER TABLE streetevents.crsp_link OWNER TO streetevents;
-GRANT SELECT ON streetevents.crsp_link TO streetevents_access;
+ALTER TABLE se_stage.crsp_link OWNER TO se_stage;
+GRANT SELECT ON se_stage.crsp_link TO se_stage_access;
 
-CREATE INDEX ON streetevents.crsp_link (file_name);
+CREATE INDEX ON se_stage.crsp_link (file_name);
 
-CREATE VIEW streetevents.company_link AS SELECT * FROM streetevents.crsp_link;
+CREATE VIEW se_stage.company_link AS SELECT * FROM se_stage.crsp_link;
