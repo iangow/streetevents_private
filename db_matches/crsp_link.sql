@@ -11,7 +11,7 @@ WITH
 calls_combined AS (
     SELECT file_name, last_update,
         COALESCE(b.company_name, a.company_name) AS company_name,
-        COALESCE(b.start_date, a.start_date) AS start_date,
+        COALESCE(a.start_date, b.start_date) AS start_date,
         COALESCE(b.company_ticker, a.company_ticker) AS company_ticker
     FROM se_stage.calls AS a
     FULL OUTER JOIN se_stage.calls_hbs AS b
