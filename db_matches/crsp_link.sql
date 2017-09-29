@@ -17,16 +17,21 @@ calls_combined AS (
     FULL OUTER JOIN se_stage.calls_hbs AS b
     USING (file_name, last_update)),
 
+calls_combined_filtered AS (
+    SELECT *
+    FROM calls_combined
+    WHERE start_date <= (SELECT max(end_date) AS max_date FROM crsp.stocknames)),
+
 earliest_calls AS (
     SELECT file_name, min(last_update) AS last_update
-    FROM calls_combined
+    FROM calls_combined_filtered
     WHERE (company_ticker ~ '\.A$' OR company_ticker !~ '\.[A-Z]+$')
         AND company_ticker IS NOT NULL
     GROUP BY file_name),
 
 earliest_calls_merged AS (
     SELECT *
-    FROM calls_combined
+    FROM calls_combined_filtered
     INNER JOIN earliest_calls
     USING (file_name, last_update)),
 
