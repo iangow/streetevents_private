@@ -224,8 +224,8 @@ SELECT file_name, permno,
 FROM all_matches
 ORDER BY file_name;
 
-ALTER TABLE se_stage.crsp_link OWNER TO se_stage;
-GRANT SELECT ON se_stage.crsp_link TO se_stage_access;
+ALTER TABLE se_stage.crsp_link OWNER TO streetevents;
+GRANT SELECT ON se_stage.crsp_link TO streetevents_access;
 
 CREATE INDEX ON se_stage.crsp_link (file_name);
 
