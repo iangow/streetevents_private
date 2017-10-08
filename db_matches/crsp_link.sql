@@ -35,12 +35,16 @@ calls AS (
         company_name AS co_name, start_date::date AS call_date
     FROM earliest_calls_merged),
 
+manual_permno_matches AS (
+    SELECT file_name, co_name, permno,
+        '0. Manual matches'::text AS match_type_desc
+    FROM se_stage.manual_permno_matches),
+
 match0 AS (
     SELECT DISTINCT a.file_name, a.ticker, COALESCE(b.co_name, a.co_name) AS co_name,
-        a.call_date, b.permno,
-        '0. Manual matches'::text AS match_type_desc
+        a.call_date, b.permno, b.match_type_desc
     FROM calls AS a
-    LEFT JOIN se_stage.manual_permno_matches AS b
+    LEFT JOIN manual_permno_matches AS b
     ON a.file_name=b.file_name),
 
 match1 AS (
@@ -55,7 +59,7 @@ match1 AS (
         -- have four characters, four is an exact match.
         -- Note: lower() has no impact.
         AND difference(a.co_name,b.comnam) = 4
-    WHERE a.permno IS NULL),
+    WHERE a.permno IS NULL AND a.match_type_desc IS NULL),
 
 /* Roll back and forward permno for companies that changed tickers at some point. Example:
     permno   namedt         nameenddt       ticker    st_date         end_date
