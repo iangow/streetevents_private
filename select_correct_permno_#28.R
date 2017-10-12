@@ -70,9 +70,7 @@ alt_permnos <-
     tbl(pg, sql("select file_name, start_date, permco, array_agg(permno) as permno
         from public.mytest2
         group by file_name, start_date, permco
-        order by permco, start_date")) %>% 
-    left_join(all_calls %>% select(file_name, event_title), by = c("file_name")) %>% 
-    distinct()
+        order by permco, start_date")) 
 # cnt = 3651
 
 # stocknames PK: (permco, permno, namedt)
@@ -91,5 +89,5 @@ test <-
     mutate(cnt = n()) %>% 
     ungroup() %>% 
     filter(cnt > 1) %>% 
-    select(file_name, start_date, permco, permno.x, permno.y, event_title, comnam, cnt) %>% 
+    select(file_name, start_date, permco, permno.x, permno.y, cnt)
     # select(permco) %>% distinct() %>% count()
