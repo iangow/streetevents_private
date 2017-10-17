@@ -30,6 +30,15 @@ CREATE ROLE streetevents_access;
 
 The following three code files need to be run in the following order:
 
+=======
+1. Get files from server.
+
+```
+rsync -avz iangow@45.113.235.201:~/uploads/ $SE_DIR
+```
+
+2. Run basic code.
+
 - The file `create_calls_files.R` extracts details about the files associated with each call (e.g., `mtime`) and puts it in `streetevents.call_files`.
 - The file `import_calls.R` extracts call-level data (e.g., ticker, call time, call type) and puts it in `streetevents.calls`.
 - The file `import_speaker_data.R` parse the speaker-level data from the XML call files and puts it
