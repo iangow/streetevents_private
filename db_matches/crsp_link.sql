@@ -9,22 +9,29 @@ CREATE TABLE streetevents.crsp_link AS
 WITH
 
 calls_combined AS (
-    SELECT file_name, company_name, start_date, company_ticker, last_update
-    FROM streetevents.calls
-    UNION
-    SELECT file_name, company_name, start_date, company_ticker, last_update
-    FROM streetevents.calls_hbs),
+    SELECT file_name, last_update,
+        COALESCE(b.company_name, a.company_name) AS company_name,
+        COALESCE(a.start_date, b.start_date) AS start_date,
+        COALESCE(b.company_ticker, a.company_ticker) AS company_ticker
+    FROM streetevents.calls AS a
+    FULL OUTER JOIN streetevents.calls_hbs AS b
+    USING (file_name, last_update)),
+
+calls_combined_filtered AS (
+    SELECT *
+    FROM calls_combined
+    WHERE start_date <= (SELECT max(end_date) AS max_date FROM crsp.stocknames)),
 
 earliest_calls AS (
     SELECT file_name, min(last_update) AS last_update
-    FROM calls_combined
+    FROM calls_combined_filtered
     WHERE (company_ticker ~ '\.A$' OR company_ticker !~ '\.[A-Z]+$')
         AND company_ticker IS NOT NULL
     GROUP BY file_name),
 
 earliest_calls_merged AS (
     SELECT *
-    FROM calls_combined
+    FROM calls_combined_filtered
     INNER JOIN earliest_calls
     USING (file_name, last_update)),
 
@@ -33,12 +40,16 @@ calls AS (
         company_name AS co_name, start_date::date AS call_date
     FROM earliest_calls_merged),
 
+manual_permno_matches AS (
+    SELECT file_name, co_name, permno,
+        '0. Manual matches'::text AS match_type_desc
+    FROM streetevents.manual_permno_matches),
+
 match0 AS (
     SELECT DISTINCT a.file_name, a.ticker, COALESCE(b.co_name, a.co_name) AS co_name,
-        a.call_date, b.permno,
-        '0. Manual matches'::text AS match_type_desc
+        a.call_date, b.permno, b.match_type_desc
     FROM calls AS a
-    LEFT JOIN streetevents.manual_permno_matches AS b
+    LEFT JOIN manual_permno_matches AS b
     ON a.file_name=b.file_name),
 
 match1 AS (
@@ -53,7 +64,7 @@ match1 AS (
         -- have four characters, four is an exact match.
         -- Note: lower() has no impact.
         AND difference(a.co_name,b.comnam) = 4
-    WHERE a.permno IS NULL),
+    WHERE a.permno IS NULL AND a.match_type_desc IS NULL),
 
 /* Roll back and forward permno for companies that changed tickers at some point. Example:
     permno   namedt         nameenddt       ticker    st_date         end_date
