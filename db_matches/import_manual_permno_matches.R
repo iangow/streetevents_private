@@ -1,4 +1,5 @@
 library(googlesheets)
+library(dplyr, warn.conflicts = FALSE)
 
 # You may need to run gs_auth() to set this up
 gs <- gs_key("14F6zjJQZRsf5PonOfZ0GJrYubvx5e_eHMV_hCGe42Qg")
