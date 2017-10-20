@@ -141,9 +141,9 @@ if (!dbExistsTable(pg, c("streetevents", "speaker_data"))) {
        CREATE INDEX ON streetevents.speaker_data (file_name, last_update);")
 }
 
-if (!dbExistsTable(pg, c("streetevents", "speaker_data_dupes_new"))) {
+if (!dbExistsTable(pg, c("streetevents", "speaker_data_dupes"))) {
     dbGetQuery(pg, "
-        CREATE TABLE streetevents.speaker_data_dupes_new
+        CREATE TABLE streetevents.speaker_data_dupes
                (file_name text, last_update timestamp with time zone);
         ALTER TABLE streetevents.speaker_data_dupes OWNER TO streetevents;")
 }
