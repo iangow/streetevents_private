@@ -18,7 +18,7 @@ extract_speaker_data <- function(file_path) {
 
     full_path <- file.path(se_path, file_path)
     if (!file.exists(full_path)) return(NULL)
-    file_name <- str_replace(file_path, "\\.xml$", "")
+    file_name <- str_replace(basename(file_path), "\\.xml$", "")
 
     read_data <- function(se_path, file_path) {
             file_xml <- read_xml(file.path(se_path, file_path), options = "NOENT")
@@ -160,11 +160,26 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
     calls <- tbl(pg, "calls")
     speaker_data <- tbl(pg, "speaker_data")
     speaker_data_dupes <- tbl(pg, "speaker_data_dupes")
+    call_files_hbs <- tbl(pg, "call_files_hbs")
+    calls_hbs <- tbl(pg, "calls_hbs")
+
+    latest_calls_hbs <-
+        calls_hbs %>%
+        select(file_path, file_name, last_update) %>%
+        inner_join(
+            call_files_hbs %>%
+                select(file_path, mtime), by="file_path") %>%
+        group_by(file_name, last_update) %>%
+        filter(mtime == max(mtime)) %>%
+        select(file_path) %>%
+        compute()
 
     if (is.null(file_list)) {
 
         file_list <-
-            calls %>%
+            calls_hbs %>%
+            semi_join(latest_calls_hbs) %>%
+            anti_join(calls, by="file_name") %>%
             select(file_path, file_name, last_update) %>%
             distinct() %>%
             arrange(random()) %>%
