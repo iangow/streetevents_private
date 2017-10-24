@@ -5,7 +5,7 @@ library(dplyr, warn.conflicts = FALSE)
 library(xml2)
 library(parallel)
 library(stringr)
-Sys.setenv(SE_DIR="/Volumes/2TB/data/streetevents_project")
+Sys.setenv(SE_DIR="/home/shared/streetevents_project")
 se_path <- file.path(Sys.getenv("SE_DIR"))
 
 getSHA1 <- function(file_name) {

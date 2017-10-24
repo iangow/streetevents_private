@@ -14,7 +14,7 @@ getSHA1 <- function(file_name) {
 }
 
 # Get a list of files ----
-Sys.setenv(SE_DIR="/Volumes/2TB/data/streetevents_project")
+Sys.setenv(SE_DIR="/home/shared/streetevents_project")
 streetevent.dir <- file.path(Sys.getenv("SE_DIR"))
 Sys.setenv(TZ='GMT')
 
