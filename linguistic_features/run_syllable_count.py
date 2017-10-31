@@ -22,12 +22,17 @@ def getFileNames(the_table, the_schema, num_files=None):
     table_exists = engine.dialect.has_table(conn, the_table, schema=the_schema)
     conn.close()
 
+    engine.execute("SET TIME ZONE 'UTC'")
+
     if table_exists:
         sql = """
             WITH latest_call AS (
                 SELECT file_name, last_update
                 FROM streetevents.calls
-                WHERE event_type=1)
+                WHERE event_type=1
+                EXCEPT
+                SELECT file_name, last_update
+                FROM streetevents.speaker_data_dupes)
             SELECT file_name, last_update
             FROM latest_call
             EXCEPT
@@ -42,9 +47,23 @@ def getFileNames(the_table, the_schema, num_files=None):
                     file_name text,
                     last_update timestamp with time zone,
                     context text,
+                    section integer,
                     speaker_number integer,
                     syllable_data jsonb)
             """ % (the_schema, the_table)
+        engine.execute(sql)
+
+        sql = """CREATE INDEX ON %s.%s
+            (file_name, last_update, section, context, speaker_number, section);
+            """ % (the_schema, the_table)
+        engine.execute(sql)
+
+        sql = "ALTER TABLE %s.%s OWNER TO %s" % \
+            (the_schema, the_table, the_schema)
+        engine.execute(sql)
+
+        sql = "GRANT SELECT ON TABLE %s.%s TO %s_access" % \
+                (the_schema, the_table, the_schema)
         engine.execute(sql)
 
         sql = """
@@ -56,16 +75,15 @@ def getFileNames(the_table, the_schema, num_files=None):
 
     return files
 
-# Get a list of files to work on.
-num_threads = 8
-files = getFileNames(the_table, the_schema)
-files = files['file_name']
-print(files[:10])
+if __name__ == "__main__":
+    # Get a list of files to work on.
+    num_threads = 24
+    files = getFileNames(the_table, the_schema)
+    files = files['file_name']
+    print(files[:10])
 
-# Set up multiprocessing environment
-pool = Pool(num_threads)
+    # Set up multiprocessing environment
+    pool = Pool(num_threads)
 
-# Do the work!
-pool.map(processFile, files)
-
-
+    # Do the work!
+    pool.map(processFile, files)
