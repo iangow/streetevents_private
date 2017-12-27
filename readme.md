@@ -1,4 +1,4 @@
-### StreetEvents data
+# StreetEvents data
 
 The code here transforms XML files for conference calls supplied by Thomson Reuters into structured tables in a PostgreSQL database.
 
@@ -28,9 +28,6 @@ CREATE ROLE streetevents_access;
 
 ## 2. Processing core tables
 
-The following three code files need to be run in the following order:
-
-=======
 1. Get files from server.
 
 ```
@@ -39,12 +36,20 @@ rsync -avz iangow@45.113.235.201:~/uploads/ $SE_DIR
 
 2. Run basic code.
 
-- The file `create_calls_files.R` extracts details about the files associated with each call (e.g., `mtime`) and puts it in `streetevents.call_files`.
+The following three code files need to be run in the following order:
+
+- The file `create_call_files.R` extracts details about the files associated with each call (e.g., `mtime`) and puts it in `streetevents.call_files`.
 - The file `import_calls.R` extracts call-level data (e.g., ticker, call time, call type) and puts it in `streetevents.calls`.
 - The file `import_speaker_data.R` parse the speaker-level data from the XML call files and puts it
   in `streetevents.speaker_data`.
 
+<<<<<<< HEAD
 ## 3. Processing additional tables
+=======
+The script `update_se.sh` does both of the steps above.
+
+## Processing additional tables
+>>>>>>> 1533914... Updated instructions.
 
 A number of other tables are created using code from this repository. These generally depend on the
 three tables above.
