@@ -45,4 +45,3 @@ This uses tickers and call dates to match firms to PERMNOs, but with some data i
 - `streetevents.qa_pairs` is created by `create_qa_pairs.R`.
 This table attempts to group distinguish questions from answers and group questions and answers.
 Often a single question will prompt multiple responses (e.g., the CEO answers at one level and the CFO provides more detail).
-
