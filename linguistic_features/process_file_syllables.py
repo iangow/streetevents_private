@@ -14,6 +14,7 @@ def processFile(file_name):
     # Get syllable data for the file_name
     engine.execute("SET time zone 'UTC'")
     df = getQuestionData(file_name)
+    
     df['syllable_data'] = df['speaker_text'].map(syllable_data)
     df = df.drop(['speaker_text'], 1)
 
