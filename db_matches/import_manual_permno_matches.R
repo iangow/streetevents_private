@@ -45,7 +45,10 @@ rs <- dbGetQuery(pg,
             AND comment != 'Fix by Nastia/Vincent in January 2015';
 
     CREATE INDEX ON streetevents.manual_permno_matches (file_name);
-")
+
+    ALTER TABLE streetevents.manual_permno_matches OWNER TO streetevents;
+
+    GRANT SELECT ON streetevents.manual_permno_matches TO streetevents_access;")
 
 rs <- dbDisconnect(pg)
 
