@@ -1,5 +1,4 @@
 #!/usr/bin/env Rscript
-
 library(xml2)
 library(stringr)
 library(dplyr, warn.conflicts = FALSE)
@@ -113,12 +112,11 @@ extract_speaker_data <- function(file_path) {
     empty_df <- tibble(file_name)
 
     file_data <- try(read_data(se_path, file_path))
-    if (is.error(file_data)) return(empty_df)
+    if (is.error(file_data) | is.null(file_data)) return(empty_df)
     return(file_data)
 }
 
 # Get a list of files that need to be processed ----
-
 library(RPostgreSQL)
 pg <- dbConnect(PostgreSQL())
 
