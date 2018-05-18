@@ -153,11 +153,12 @@ rs <- dbDisconnect(pg)
 process_calls <- function(num_calls = 1000, file_list = NULL) {
     pg <- dbConnect(PostgreSQL())
 
-    call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
-    calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
-    speaker_data <- tbl(pg, sql("SELECT * FROM streetevents.speaker_data"))
-    speaker_data_dupes <-
-        tbl(pg, sql("SELECT * FROM streetevents.speaker_data_dupes"))
+    dbExecute(pg, "SET search_path TO streetevents")
+
+    call_files <- tbl(pg, "call_files")
+    calls <- tbl(pg, "calls")
+    speaker_data <- tbl(pg, "speaker_data")
+    speaker_data_dupes <- tbl(pg, "speaker_data_dupes")
 
     if (is.null(file_list)) {
 
