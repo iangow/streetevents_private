@@ -172,51 +172,59 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
     if (nrow(file_list)==0) return(FALSE)
     temp <- mclapply(file_list$file_path, extract_speaker_data, mc.cores=12)
 
-    print(length(temp ))
-    speaker_data <-
-        bind_rows(temp) %>%
-        filter(speaker_text != "")
+    print(length(temp))
 
-    print(sprintf("Speaker data has %d rows", nrow(speaker_data)))
+    temp_df <- bind_rows(temp)
 
-    if (nrow(speaker_data) == 0) {
-        dupes <- file_list
-    } else {
-        dupes <-
-            speaker_data %>%
-            group_by(file_name, last_update, speaker_number, context, section) %>%
-            filter(n() > 1) %>%
-            ungroup() %>%
-            union_all(
-                speaker_data %>%
-                    filter(is.na(speaker_number) | is.na(context) | is.na(section)))
+    if ("speaker_text" %in% colnames(temp_df)) {
 
         speaker_data <-
-            speaker_data %>%
-            anti_join(dupes, by=c("file_name", "last_update"))
+            temp_df %>%
+            filter(speaker_text != "")
+
+        print(sprintf("Speaker data has %d rows", nrow(speaker_data)))
+
+        if (nrow(speaker_data) == 0) {
+            dupes <- file_list
+        } else {
+            dupes <-
+                speaker_data %>%
+                group_by(file_name, last_update, speaker_number, context, section) %>%
+                filter(n() > 1) %>%
+                ungroup() %>%
+                union_all(
+                    speaker_data %>%
+                        filter(is.na(speaker_number) | is.na(context) | is.na(section)))
+
+            speaker_data <-
+                speaker_data %>%
+                anti_join(dupes, by=c("file_name", "last_update"))
+        }
+
+        rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
+        if (nrow(speaker_data) > 0) {
+            print("Writing data to Postgres")
+
+            dbWriteTable(pg, c("streetevents", "speaker_data"),
+                         speaker_data, row.names=FALSE, append=TRUE)
+        }
+        print("Writing dupe data to Postgres")
+
+        if (nrow(dupes) > 0) {
+            file_path <-
+                dupes %>%
+                select(file_name, last_update) %>%
+                distinct()
+
+            dbWriteTable(pg, c("streetevents", "speaker_data_dupes"), file_path,
+                         row.names=FALSE, append=TRUE)
+        }
+
+        rs <- dbDisconnect(pg)
+        return(nrow(file_list)>0)
+    } else {
+        return(FALSE)
     }
-
-    rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
-    if (nrow(speaker_data) > 0) {
-        print("Writing data to Postgres")
-
-        dbWriteTable(pg, c("streetevents", "speaker_data"),
-                     speaker_data, row.names=FALSE, append=TRUE)
-    }
-    print("Writing dupe data to Postgres")
-
-    if (nrow(dupes) > 0) {
-        file_path <-
-            dupes %>%
-            select(file_name, last_update) %>%
-            distinct()
-
-        dbWriteTable(pg, c("streetevents", "speaker_data_dupes"), file_path,
-                     row.names=FALSE, append=TRUE)
-    }
-
-    rs <- dbDisconnect(pg)
-    return(nrow(file_list)>0)
 }
 
 system.time(while(tm <- process_calls(num_calls = 4000)) {
