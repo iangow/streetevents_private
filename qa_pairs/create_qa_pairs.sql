@@ -6,20 +6,22 @@ WITH sample_transcripts AS (
     SELECT a.file_name, a.last_update, a.section,
         a.speaker_name, a.speaker_number,
         trim(a.speaker_text) AS speaker_text, a.role,
-        role != 'Analyst' AS is_answer,
-        role = 'Analyst' AND speaker_text ~ '\?' AS is_question
+        lag(speaker_name) OVER w != 'Operator' AND role != 'Analyst' AS is_answer,
+        (lag(speaker_name) OVER w = 'Operator' OR role = 'Analyst') AS is_question
     FROM streetevents.speaker_data AS a
     INNER JOIN streetevents.calls
     USING (file_name, last_update)
-    WHERE event_type=1 AND context='qa' AND speaker_name != 'Operator'
+    WHERE event_type=1 AND context='qa'
         AND section = 1
         AND file_name='%s'
+    WINDOW w AS (PARTITION BY file_name, last_update, section ORDER BY speaker_number)
     ORDER BY file_name, last_update, speaker_number),
 
 grouped AS (
    SELECT *,
       sum(is_question::integer) OVER all_obs AS question_group
    FROM sample_transcripts
+   WHERE speaker_name != 'Operator'
    WINDOW all_obs AS (PARTITION BY file_name, last_update ORDER BY speaker_number)),
 
 questions_raw AS (
@@ -28,7 +30,7 @@ questions_raw AS (
       array_agg(speaker_number ORDER BY speaker_number) AS speaker_numbers,
       bool_or(is_question) AS is_question
     FROM grouped
-    WHERE role ~ 'Analyst'
+    WHERE is_question OR role ~ 'Analyst'
     GROUP BY file_name, last_update, question_group, speaker_name),
 
 questions_inter AS (
@@ -50,7 +52,7 @@ answers AS (
     INNER JOIN questions AS b
     ON a.file_name=b.file_name AND a.speaker_number>=b.first_speaker_num AND
         (a.speaker_number <= b.last_speaker_num OR b.last_speaker_num IS NULL)
-    WHERE is_answer
+    WHERE is_answer AND NOT speaker_number = ANY(question_nums)
     GROUP BY a.file_name, a.last_update, b.first_speaker_num)
 
 SELECT file_name, last_update, question_nums, answer_nums
