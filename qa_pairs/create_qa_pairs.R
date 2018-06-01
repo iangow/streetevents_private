@@ -1,4 +1,4 @@
-library("RPostgreSQL")
+library(RPostgreSQL)
 
 pg <- dbConnect(PostgreSQL())
 
@@ -17,8 +17,6 @@ if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
 
         CREATE INDEX ON streetevents.qa_pairs (file_name, last_update);
         ALTER TABLE streetevents.qa_pairs OWNER TO streetevents;
-        GRANT SELECT ON streetevents.qa_pairs TO streetevents_access;
-
         GRANT SELECT ON streetevents.qa_pairs TO streetevents_access;")
 }
 
@@ -26,7 +24,7 @@ rs <- dbDisconnect(pg)
 
 # Get a list of files on StreetEvents, but not on qa_pairs table.
 library(dplyr, warn.conflicts = FALSE)
-pg <- src_postgres()
+pg <- dbConnect(PostgreSQL())
 
 calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
 qa_pairs <- tbl(pg, sql("SELECT * FROM streetevents.qa_pairs"))
