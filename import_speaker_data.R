@@ -72,6 +72,8 @@ extract_speaker_data <- function(file_path) {
                         employer <- NA
                         role <- NA
                     }
+                    speaker_name <- if_else(is.na(speaker_name),
+                                            str_trim(temp2[, 2]), speaker_name)
                 } else {
                     speaker_number <- NA
                     speaker_name <- NA
