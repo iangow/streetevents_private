@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+cat("Importing speaker data.")
 library(xml2)
 library(stringr)
 library(dplyr, warn.conflicts = FALSE)
