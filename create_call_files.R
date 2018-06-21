@@ -45,7 +45,7 @@ if (!new_table) {
     new_files <-
         call_files_temp %>%
         select(file_path, mtime) %>%
-        anti_join(call_files) %>%
+        anti_join(call_files, by = c("file_path", "mtime")) %>%
         collect()
 
     rs <- dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.call_files_temp")
@@ -53,7 +53,8 @@ if (!new_table) {
     if (dim(new_files)[1]>0) {
         new_files_plus <-
             new_files %>%
-            inner_join(file_list %>% select(-mtime))
+            inner_join(file_list %>% select(-mtime),
+                       by = "file_path")
     } else {
         new_files_plus <- tibble()
     }
@@ -107,8 +108,6 @@ split_df <- function(df, n = 10) {
 
 # Process files ----
 if (dim(new_files_plus)[1]>0) {
-
     new_file_dfs <- split_df(new_files_plus, n = 1000)
-
     rs <- lapply(new_file_dfs, process_rows)
 }
