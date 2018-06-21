@@ -1,5 +1,4 @@
 #!/usr/bin/env Rscript
-
 library(RPostgreSQL)
 library(dplyr, warn.conflicts = FALSE)
 library(xml2)
@@ -88,15 +87,15 @@ Sys.setenv(TZ='GMT')
 
 pg <- dbConnect(PostgreSQL())
 
-call_files <- tbl(pg, sql("SELECT * FROM streetevents.call_files"))
-
-calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
+rs <- dbExecute(pg, "SET search_path TO streetevents")
+call_files <- tbl(pg, "call_files")
+calls <- tbl(pg, "calls")
 
 get_file_list <- function() {
     df <-
         call_files %>%
         select(file_path, sha1) %>%
-        anti_join(calls) %>%
+        anti_join(calls, by = c("file_path", "sha1")) %>%
         select(-sha1) %>%
         collect(n=5000)
 
@@ -110,7 +109,7 @@ while (length(file_list <- get_file_list()) > 0) {
 
     rs <- dbGetQuery(pg, "SET TIME ZONE 'GMT'")
     if (nrow(calls_new) > 0) {
-        rs <- dbWriteTable(pg, c("streetevents", "calls"), calls_new,
+        rs <- dbWriteTable(pg, "calls", calls_new,
                        append = TRUE, row.names = FALSE)
     }
 }
