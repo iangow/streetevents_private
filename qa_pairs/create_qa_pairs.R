@@ -48,5 +48,5 @@ addQAPairs <- function(file_name) {
 
 # Code that applies addQAPairs to function in parallel.
 library(parallel)
-system.time(res <- unlist(mclapply(file_list$file_name, addQAPairs, mc.cores=8)))
+system.time(res <- unlist(mclapply(file_list$file_name, addQAPairs, mc.cores=20)))
 
