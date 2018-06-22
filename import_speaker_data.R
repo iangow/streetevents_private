@@ -5,7 +5,7 @@ library(stringr)
 library(dplyr, warn.conflicts = FALSE)
 library(parallel)
 
-Sys.setenv(SE_DIR="/Volumes/2TB/data/streetevents_project")
+Sys.setenv(SE_DIR="/home/shared/streetevents_project")
 se_path <- file.path(Sys.getenv("SE_DIR"))
 Sys.setenv(TZ='GMT')
 
