@@ -163,13 +163,21 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
 
     if (is.null(file_list)) {
 
+        processed_files <-
+            speaker_data %>%
+            select(file_name, last_update) %>%
+            union_all(
+                speaker_data_dupes %>%
+                    select(file_name, last_update)) %>%
+            inner_join(calls, by = c("file_name", "last_update")) %>%
+            select(file_path)
+
         file_list <-
             calls %>%
             select(file_path, file_name, last_update) %>%
             distinct() %>%
             arrange(random()) %>%
-            anti_join(speaker_data, by = c("file_name", "last_update")) %>%
-            anti_join(speaker_data_dupes, by = c("file_name", "last_update")) %>%
+            anti_join(processed_files, by = "file_path") %>%
             collect(n=num_calls)
     }
     if (nrow(file_list)==0) return(FALSE)
