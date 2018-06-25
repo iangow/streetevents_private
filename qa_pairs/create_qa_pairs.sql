@@ -50,7 +50,8 @@ answers AS (
         array_agg(speaker_number ORDER BY speaker_number) AS answer_nums
     FROM sample_transcripts AS a
     INNER JOIN questions AS b
-    ON a.file_name=b.file_name AND a.speaker_number>=b.first_speaker_num AND
+    ON a.file_name=b.file_name AND a.last_update = b.last_update
+        AND a.speaker_number>=b.first_speaker_num AND
         (a.speaker_number <= b.last_speaker_num OR b.last_speaker_num IS NULL)
     WHERE is_answer AND NOT speaker_number = ANY(question_nums)
     GROUP BY a.file_name, a.last_update, b.first_speaker_num)
