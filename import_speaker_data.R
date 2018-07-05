@@ -161,6 +161,13 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
     speaker_data <- tbl(pg, "speaker_data")
     speaker_data_dupes <- tbl(pg, "speaker_data_dupes")
 
+    current_files <-
+        call_files %>%
+        group_by(file_path) %>%
+        summarize(mtime = max(mtime, na.rm = TRUE)) %>%
+        inner_join(call_files, by = c("file_path", "mtime")) %>%
+        select(file_path, sha1)
+
     if (is.null(file_list)) {
 
         processed_files <-
@@ -170,14 +177,15 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
                 speaker_data_dupes %>%
                     select(file_name, last_update)) %>%
             inner_join(calls, by = c("file_name", "last_update")) %>%
-            select(file_path)
+            select(file_path, last_update)
 
         file_list <-
             calls %>%
+            semi_join(current_files, by = c("file_path", "sha1")) %>%
             select(file_path, file_name, last_update) %>%
             distinct() %>%
             arrange(random()) %>%
-            anti_join(processed_files, by = "file_path") %>%
+            anti_join(processed_files, by = c("file_path", "last_update")) %>%
             collect(n=num_calls)
     }
     if (nrow(file_list)==0) return(FALSE)
