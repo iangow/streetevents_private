@@ -1,4 +1,6 @@
 #!/usr/bin/env Rscript
+cat('Updating data on ', Sys.getenv("PGHOST"), ".", sep="")
+
 library(RPostgreSQL)
 
 pg <- dbConnect(PostgreSQL())

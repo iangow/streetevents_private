@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-cat("Importing speaker data.")
+cat('Updating speaker data on ', Sys.getenv("PGHOST"), ".", sep="")
 library(xml2)
 library(stringr)
 library(dplyr, warn.conflicts = FALSE)
@@ -246,7 +246,6 @@ process_calls <- function(num_calls = 1000, file_list = NULL) {
     }
 }
 
-system.time(while(tm <- process_calls(num_calls = 4000)) {
+system.time(while(tm <- process_calls(num_calls = 40)) {
     print(tm)
 })
-

@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+cat('Updating call_files data on ', Sys.getenv("PGHOST"), ".", sep="")
 
 # Code to generate a list of files in the StreetEvents directory
 # and post to PostgreSQL.

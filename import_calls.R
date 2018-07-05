@@ -1,4 +1,6 @@
 #!/usr/bin/env Rscript
+cat('Updating calls data on ', Sys.getenv("PGHOST"), ".", sep="")
+
 library(RPostgreSQL)
 library(dplyr, warn.conflicts = FALSE)
 library(xml2)
