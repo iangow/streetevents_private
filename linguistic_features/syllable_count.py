@@ -35,7 +35,6 @@ def syllable_data(text):
     words = [w for w in word_tokens if nonPunct.match(w)]
     words_7 = [word for word in words if len(word)>=7]
 
-
     sylls = [nsyl(word.lower()) for word in words]
     syl_dict = {
             'sent_count': len(sents),
@@ -45,3 +44,12 @@ def syllable_data(text):
             'syllable_counts': \
                 Counter([syll for syll in  sylls if syll is not None])}
     return json.dumps(syl_dict)
+
+def get_long_words(text):
+
+    words = [word.lower() for sent in nltk.sent_tokenize(text.decode('utf8'))
+                for word in nltk.word_tokenize(sent)]
+
+    # Require words to be more than three characters. Otherwise, "edu"="E-D-U" => 3 syllables
+    words = [word for word in words if nsyl(word)>=3 and len(word)>3]
+    return words
