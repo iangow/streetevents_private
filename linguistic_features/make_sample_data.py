@@ -12,5 +12,4 @@ engine = create_engine(conn_string)
 
 speaker_data = read_sql("SELECT * FROM streetevents.speaker_data WHERE file_name = '5189334_T'", engine)
 
-
-feather.write_dataframe(df=speaker_data, path="sample.feather")
+feather.write_dataframe(df=speaker_data, dest="sample.feather")
