@@ -231,6 +231,10 @@ SELECT file_name, permno,
     regexp_replace(match_type_desc, '^([0-9]+).*', '\1')::int AS match_type,
     match_type_desc
 FROM all_matches
+WHERE (file_name, permno) NOT IN (
+    SELECT DISTINCT file_name, permno
+    FROM streetevents.bad_matches
+)
 ORDER BY file_name;
 
 ALTER TABLE streetevents.crsp_link OWNER TO streetevents;
