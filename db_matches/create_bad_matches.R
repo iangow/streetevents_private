@@ -6,6 +6,7 @@ library(readr)
 pg <- dbConnect(PostgreSQL())
 calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
 crsp_link <- tbl(pg, sql("SELECT * FROM streetevents.crsp_link"))
+bad_matches <- tbl(pg, sql("SELECT * FROM streetevents.bad_matches"))
 
 regex <- "(?:Earnings(?: Conference Call)?|Financial and Operating Results|Financial Results Call|"
 regex <- paste0(regex, "Results Conference Call|Analyst Meeting)")
@@ -29,19 +30,19 @@ calls_mod <-
     compute()
 
 name_checks <- 
-    gs_read(gs_key("1_RKRJah6iuUHC-y_kHP58Dl6UaptIhBNPRSyTjIjSSM")) %>% 
-    copy_to(pg, ., name = 'name_checks', temporary = TRUE)
+    gs_read(gs_key("1_RKRJah6iuUHC-y_kHP58Dl6UaptIhBNPRSyTjIjSSM"))
 
-dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.bad_matches")
 dbGetQuery(pg, "DROP TABLE IF EXISTS public.bad_matches")
 
 bad_matches <- 
     name_checks %>% 
     filter(valid == FALSE) %>% 
-    inner_join(calls_mod, by = c("event_co_name", "permno")) %>% 
+    inner_join(calls_mod, by = c("event_co_name", "permno"), copy = TRUE) %>% 
     select(file_name, permno, valid, event_co_name, comnams, event_title) %>% 
-    compute(name = 'bad_matches', temporary = FALSE)
+    union(bad_matches) %>% 
+    copy_to(pg, ., name = 'bad_matches', temporary = FALSE)
 
+dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.bad_matches")
 dbGetQuery(pg, "ALTER TABLE public.bad_matches SET SCHEMA streetevents")
 dbGetQuery(pg, "ALTER TABLE streetevents.bad_matches OWNER TO streetevents")
 dbGetQuery(pg, "GRANT SELECT ON streetevents.bad_matches TO streetevents_access")
