@@ -43,13 +43,8 @@ The following three code files need to be run in the following order:
 - The file `import_speaker_data.R` parse the speaker-level data from the XML call files and puts it
   in `streetevents.speaker_data`.
 
-<<<<<<< HEAD
 ## 3. Processing additional tables
-=======
 The script `update_se.sh` does both of the steps above.
-
-## Processing additional tables
->>>>>>> 1533914... Updated instructions.
 
 A number of other tables are created using code from this repository. These generally depend on the
 three tables above.
