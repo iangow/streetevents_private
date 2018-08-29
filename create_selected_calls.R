@@ -10,27 +10,23 @@ calls <- tbl(pg, "calls")
 latest_calls <-
     calls %>%
     group_by(file_name) %>%
-    # Consider earnings call only
-    filter(event_type == 1) %>%
     # Filter file_name with no valid information
     filter(!is.na(start_date)) %>%
     summarize(last_update = max(last_update, na.rm = TRUE),
-              has_company_id = max(as.integer(!is.na(company_id)), na.rm = TRUE)) %>%
-    ungroup()
+              has_company_id = bool_or(!is.na(company_id))) %>%
+    ungroup() 
 
 dbGetQuery(pg, "DROP TABLE IF EXISTS selected_calls")
 
 selected_calls <-
     calls %>%
-    mutate(has_company_id = as.integer(!is.na(company_id))) %>%
-    semi_join(latest_calls) %>%
+    mutate(has_company_id = !is.na(company_id)) %>%
+    semi_join(latest_calls, by = c("file_name", "last_update", "has_company_id")) %>%
     group_by(file_name) %>%
     summarize(file_path = max(file_path, na.rm = TRUE)) %>%
     ungroup() %>%
-    inner_join(latest_calls) %>%
-    group_by(file_name, file_path) %>%
-    summarise(last_update = max(last_update, na.rm = TRUE)) %>%
-    ungroup() %>%
+    inner_join(latest_calls, by = "file_name") %>%
+    distinct(file_name, file_path, last_update) %>% compute()
     compute(name = "selected_calls", temporary = FALSE)
 
 dbGetQuery(pg, "ALTER TABLE selected_calls OWNER TO streetevents")
