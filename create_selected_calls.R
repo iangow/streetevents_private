@@ -15,7 +15,8 @@ latest_calls <-
     # Filter file_name with no valid information
     filter(!is.na(start_date)) %>%
     summarize(last_update = max(last_update, na.rm = TRUE),
-              has_company_id = max(as.integer(!is.na(company_id)), na.rm = TRUE))
+              has_company_id = max(as.integer(!is.na(company_id)), na.rm = TRUE)) %>%
+    ungroup()
 
 dbGetQuery(pg, "DROP TABLE IF EXISTS selected_calls")
 
@@ -25,8 +26,11 @@ selected_calls <-
     semi_join(latest_calls) %>%
     group_by(file_name) %>%
     summarize(file_path = max(file_path, na.rm = TRUE)) %>%
+    ungroup() %>%
     inner_join(latest_calls) %>%
-    select(file_name, file_path) %>%
+    group_by(file_name, file_path) %>%
+    summarise(last_update = max(last_update, na.rm = TRUE)) %>%
+    ungroup() %>%
     compute(name = "selected_calls", temporary = FALSE)
 
 dbGetQuery(pg, "ALTER TABLE selected_calls OWNER TO streetevents")
