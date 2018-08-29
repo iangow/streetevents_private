@@ -35,6 +35,8 @@ selected_calls <-
 
 dbGetQuery(pg, "ALTER TABLE selected_calls OWNER TO streetevents")
 dbGetQuery(pg, "GRANT SELECT ON TABLE selected_calls TO streetevents_access")
+dbGetQuery(pg, "CREATE INDEX ON streetevents.selected_calls (file_path)")
+dbGetQuery(pg, "CREATE INDEX ON streetevents.selected_calls (file_name, file_path)")
 
 comment <- 'CREATED USING iangow/streetevents_private/create_selected_calls.R'
 sql <- paste0("COMMENT ON TABLE selected_calls IS '",
