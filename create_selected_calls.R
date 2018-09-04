@@ -26,7 +26,7 @@ selected_calls <-
     summarize(file_path = max(file_path, na.rm = TRUE)) %>%
     ungroup() %>%
     inner_join(latest_calls, by = "file_name") %>%
-    distinct(file_name, file_path, last_update) %>% compute()
+    distinct(file_name, file_path, last_update) %>% 
     compute(name = "selected_calls", temporary = FALSE)
 
 dbGetQuery(pg, "ALTER TABLE selected_calls OWNER TO streetevents")
