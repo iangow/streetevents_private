@@ -8,8 +8,6 @@ pg <- dbConnect(PostgreSQL())
 # If table doesn't exist, create it.
 if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
     dbGetQuery(pg, "
-        DROP TABLE IF EXISTS streetevents.qa_pairs;
-
         CREATE TABLE streetevents.qa_pairs
         (
           file_name text,
@@ -29,14 +27,18 @@ rs <- dbDisconnect(pg)
 library(dplyr, warn.conflicts = FALSE)
 pg <- dbConnect(PostgreSQL())
 
-calls <- tbl(pg, sql("SELECT * FROM streetevents.calls"))
-qa_pairs <- tbl(pg, sql("SELECT * FROM streetevents.qa_pairs"))
+rs <- dbExecute(pg, "SET search_path TO streetevents")
+
+calls <- tbl(pg, "calls")
+speaker_data <- tbl(pg, "speaker_data")
+qa_pairs <- tbl(pg, "qa_pairs")
 
 file_list <-
     calls %>%
     filter(event_type == 1L) %>%
+    semi_join(speaker_data, by = c("file_name", "last_update")) %>%
     select(file_name, last_update) %>%
-    anti_join(qa_pairs) %>%
+    anti_join(qa_pairs, by = c("file_name", "last_update")) %>%
     collect(n = Inf)
 
 # A function that calls the parameterized query to process each file
