@@ -13,13 +13,14 @@ executive_manual_matches <-
     gs_read(ws = "Sheet1", gs_key("1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c")) %>% 
     filter(good_match == TRUE) %>% 
     copy_to(pg, ., name = 'executive_manual_matches', temporary = FALSE)
+
 executive_manual_matches <- 
     executive_manual_matches %>% 
     compute()
+
 manual_add_exe_id <- 
     gs_read(ws = "manual_add_executive_id", gs_key("1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c"))
 proxy_management <- tbl(pg, sql("SELECT * FROM executive.proxy_management"))
-se_exec_link <- tbl(pg, sql("SELECT * from personality.se_exec_link"))  # company_id, executive_id, file_name, speaker_name, match_type
 
 manual_matches <- # file_name, speaker_name, company_id, management_id  # Need executive_id
     executive_manual_matches %>%
@@ -108,57 +109,59 @@ result <-
     mutate(has_match = !is.na(executive_id)) %>%
     compute()
 
-manual_matches_exe_id <- # 1666
+manual_matches_exe_id <- # 2299
     result %>% 
     filter(has_match == TRUE) %>% 
     select(file_name, speaker_name, company_id, management_id,executive_id) %>% 
     mutate(exe_id_match = as.character("(company_id, management_id)"))
 
-# Case 2: (fname, lname) match ----
-full_match <- 
+# Case 2: Manual match ----
+manual_match <- # 633
     result %>% 
-    filter(has_match == FALSE) %>% 
+    filter(is.na(executive_id)) %>% 
     select(file_name, speaker_name, company_id, first_name.x, last_name.x) %>% 
     mutate(first_name = upper(first_name.x),
            last_name = upper(last_name.x)) %>% 
     select(-first_name.x, -last_name.x) %>% 
     distinct() %>% 
+    left_join(manual_add_exe_id, by = c("file_name", "speaker_name", "company_id"), copy = TRUE)
+
+manual_matches_exe_id <- # 2311
+    manual_match %>% 
+    filter(!is.na(executive_id)) %>% 
+    select(file_name, speaker_name, company_id, management_id, executive_id) %>% 
+    mutate(exe_id_match = as.character("from gs: (manual_add_executive_id)")) %>% 
+    union(manual_matches_exe_id)
+
+# Case 3: (fname, lname) match ----
+full_match <- 
+    manual_match %>% 
+    filter(is.na(executive_id)) %>% 
+    select(file_name, speaker_name, company_id, first_name, last_name) %>% 
+    mutate(first_name = upper(first_name),
+           last_name = upper(last_name)) %>% 
+    distinct() %>% 
     left_join(mgt_link, by = c("company_id", "first_name" , "last_name")) 
 
-manual_matches_exe_id <- # 1798
+manual_matches_exe_id <- # 2437
     full_match %>% 
     filter(!is.na(executive_id)) %>% 
     select(file_name, speaker_name, company_id, management_id, executive_id) %>% # 132
     mutate(exe_id_match = as.character("(company_id, fname, lname)")) %>% 
     union(manual_matches_exe_id)
 
-# Case 3: Last name match ----
+# Case 4: Last name match ----
 lname_match <- 
     full_match %>% 
     filter(is.na(executive_id)) %>% 
     select(file_name, speaker_name, company_id, first_name, last_name) %>% 
     left_join(mgt_link, by = c("company_id", "last_name")) 
 
-manual_matches_exe_id <- # 1975
+manual_matches_exe_id <- # 2610
     lname_match %>% 
     filter(!is.na(executive_id)) %>% 
     select(file_name, speaker_name, company_id, management_id, executive_id) %>% # 177
     mutate(exe_id_match = as.character("(company_id, lname)")) %>% 
-    union(manual_matches_exe_id)
-
-# Case 4: Manual match ----
-manual_match <- # 407
-    lname_match %>% 
-    filter(is.na(executive_id)) %>% 
-    select(file_name, speaker_name, company_id, first_name.x, last_name) %>% 
-    rename(first_name = first_name.x) %>% 
-    left_join(manual_add_exe_id, copy = TRUE)
-
-manual_matches_exe_id <- # 1988
-    manual_match %>% 
-    filter(!is.na(executive_id)) %>% 
-    select(file_name, speaker_name, company_id, management_id, executive_id) %>% 
-    mutate(exe_id_match = as.character("from gs: (manual_add_executive_id)")) %>% 
     union(manual_matches_exe_id)
 
 # Upload to pg ----
@@ -182,18 +185,18 @@ db_comment <- paste0("CREATED USING iangow/streetevents_private/import_executive
 dbGetQuery(pg$con, sprintf("COMMENT ON TABLE streetevents.executive_manual_matches IS '%s';", db_comment))
 
 # Check no match ----
-no_match <- # 394
+no_match <- # 621
     manual_match %>% 
     filter(is.na(executive_id)) %>% 
     select(file_name, speaker_name, company_id, first_name, last_name)
 
-# Only 2/90 remaining company_ids have matches in mgt_link using company_id
-no_match %>% select(company_id) %>% distinct() %>% # 90
+# Only 69/152 remaining company_ids have matches in mgt_link using company_id
+no_match %>% select(company_id) %>% distinct() %>% # 152
     inner_join(mgt_link %>% select(company_id) %>% distinct()) %>% 
-    count() # 2
+    count() # 69
 
 no_match %>% 
-    inner_join(mgt_link, by = "company_id") %>% 
+    inner_join(mgt_link, by = "company_id") %>% count()
     select(file_name, speaker_name, matches("first_name"), matches("last_name"), everything()) %>% 
     arrange(file_name, speaker_name, company_id) %>% 
     View()
