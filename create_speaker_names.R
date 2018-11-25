@@ -49,8 +49,14 @@ speaker_names <-
     select(speaker_name, prefix, first_name, middle_name, last_name) %>%
     compute(name = "speaker_names", temporary = FALSE)
 
+dbGetQuery(pg, "ALTER TABLE streetevents.speaker_names OWNER TO streetevents")
+dbGetQuery(pg, "GRANT SELECT ON streetevents.speaker_names TO streetevents_access")
+db_comment <- paste0("CREATED USING create_speaker_names.R ON ", Sys.time())
+dbGetQuery(pg, sprintf("COMMENT ON TABLE streetevents.speaker_names IS '%s';", db_comment))
+
 # Some cases have just a prefix and no first name. These could
 # be cleaned up using prefix_regex
+speaker_names <- tbl(pg, "speaker_names")
 speaker_names %>%
     filter(first_name %~% paste0("^", prefix_regex, "$")) %>%
     count(prefix, first_name) %>%
