@@ -172,6 +172,59 @@ problem %>% arrange(company_id, fy_end, start_date) %>% View()
 
 7. Run `create_se_call_link.R` and `create_se_exec_link.R` in `executive` repo to update `executive.se_call_link` and `executive.se_exec_link` tables.
 
+8. Do consistency check on `executive.se_exec_link`.
+```r
+library(dplyr, warn.conflicts = FALSE)
+library(RPostgreSQL)
+pg <- dbConnect(PostgreSQL())
+new <- tbl(pg, sql("SELECT * FROM executive.se_exec_link_new")) 
+new %>% count()
+# Check for missing keys
+new %>%
+    filter(is.na(company_id)
+           | is.na(executive_id)
+           | is.na(file_name)) %>%
+    arrange(file_name, speaker_name) %>% 
+    print(n=Inf) # Should be none
+
+# Same file_name multiple company_ids?
+new %>%
+    select(company_id, file_name) %>%
+    distinct() %>%
+    group_by(file_name) %>%
+    filter(n() > 1) %>%
+    ungroup() %>%
+    summarize(n()) # Should be none
+
+# Same speaker to multiple executives?
+new %>%
+    group_by(file_name, speaker_name) %>%
+    filter(n() > 1) %>%
+    ungroup() %>%
+    summarize(n())
+    collect() %>% 
+    View() # Should be none, otherwise append to "speaker_filename" spreadsheet (see below)
+    
+
+# How to append to speaker_filename ----
+ret <- 
+    new %>%
+    group_by(file_name, speaker_name) %>%
+    filter(n() > 1) %>%
+    ungroup() %>%
+    # summarize(n())
+    collect() %>% 
+    left_join(speaker_data %>% distinct(file_name, speaker_name, role), by = c("file_name", "speaker_name"), copy = TRUE) %>% 
+    left_join(proxy_management %>% 
+                  distinct(company_id, executive_id, title, bio), 
+              by = c("company_id", "executive_id"), 
+              copy = TRUE) %>% 
+    compute()
+
+ret %>% write.csv('~/speaker_filename.csv')
+# speaker_filename: gs_key("1SVDYjvxR8KV7tOfr0IpCXNqmI8Sia_7cSChLuv-SFvY")
+```
+
 ### 3.2 streetevents.qa_pairs
 - `streetevents.qa_pairs` is created by `create_qa_pairs.R`.
 This table attempts to group distinguish questions from answers and group questions and answers.
