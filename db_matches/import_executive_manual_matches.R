@@ -7,8 +7,9 @@ library(dplyr)
 library(googlesheets)
 library(RPostgreSQL)
 
-pg <- src_postgres()
+pg <- dbConnect(PostgreSQL())
 # gs_auth()
+dbGetQuery(pg, "DROP TABLE IF EXISTS public.executive_manual_matches")
 executive_manual_matches <- 
     gs_read(ws = "Sheet1", gs_key("1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c")) %>% 
     filter(good_match == TRUE) %>% 
@@ -47,7 +48,7 @@ split_names <- function(df){
     
     name_regex <- paste0("^(?:(", prefix_regex, ")\\s)?", "(.*?)\\s", "(.*)$")
     suffix <- paste0("(?:", "\\sJr\\.?|II|III|MD", ")")
-
+    
     df <-
         df %>% 
         mutate(full_names = regexp_split_to_array(full_name, suffix)) %>% 
@@ -126,12 +127,14 @@ manual_match <- # 633
     distinct() %>% 
     left_join(manual_add_exe_id, by = c("file_name", "speaker_name", "company_id"), copy = TRUE)
 
-manual_matches_exe_id <- # 2311
-    manual_match %>% 
-    filter(!is.na(executive_id)) %>% 
-    select(file_name, speaker_name, company_id, management_id, executive_id) %>% 
-    mutate(exe_id_match = as.character("from gs: (manual_add_executive_id)")) %>% 
-    union(manual_matches_exe_id)
+if (manual_match %>% filter(!is.na(executive_id)) %>% count() %>% collect()!=0) {
+    manual_matches_exe_id <- # 2311
+        manual_match %>% 
+        filter(!is.na(executive_id)) %>% 
+        select(file_name, speaker_name, company_id, management_id, executive_id) %>% 
+        mutate(exe_id_match = as.character("from gs: (manual_add_executive_id)")) %>% 
+        union(manual_matches_exe_id)
+}
 
 # Case 3: (fname, lname) match ----
 full_match <- 
@@ -147,7 +150,7 @@ manual_matches_exe_id <- # 2437
     full_match %>% 
     filter(!is.na(executive_id)) %>% 
     select(file_name, speaker_name, company_id, management_id, executive_id) %>% # 132
-    mutate(exe_id_match = as.character("(company_id, fname, lname)")) %>% 
+    mutate(exe_id_match = as.character("(company_id, fname, lname)")) %>%  
     union(manual_matches_exe_id)
 
 # Case 4: Last name match ----
@@ -165,8 +168,8 @@ manual_matches_exe_id <- # 2610
     union(manual_matches_exe_id)
 
 # Upload to pg ----
-dbGetQuery(pg$con, "DROP TABLE IF EXISTS public.executive_manual_matches")
-dbGetQuery(pg$con, "DROP TABLE IF EXISTS streetevents.executive_manual_matches")
+dbGetQuery(pg, "DROP TABLE IF EXISTS public.executive_manual_matches")
+dbGetQuery(pg, "DROP TABLE IF EXISTS streetevents.executive_manual_matches")
 executive_manual_matches_new <- 
     manual_matches_exe_id %>% 
     left_join(executive_manual_matches %>% 
@@ -178,11 +181,11 @@ executive_manual_matches_new <-
     distinct() %>% 
     compute(name = 'executive_manual_matches', temporary = FALSE)
 
-dbGetQuery(pg$con, "ALTER TABLE executive_manual_matches SET SCHEMA streetevents")
-dbGetQuery(pg$con, "ALTER TABLE streetevents.executive_manual_matches OWNER TO streetevents")
-dbGetQuery(pg$con, "GRANT SELECT ON streetevents.executive_manual_matches TO streetevents_access")
+dbGetQuery(pg, "ALTER TABLE executive_manual_matches SET SCHEMA streetevents")
+dbGetQuery(pg, "ALTER TABLE streetevents.executive_manual_matches OWNER TO streetevents")
+dbGetQuery(pg, "GRANT SELECT ON streetevents.executive_manual_matches TO streetevents_access")
 db_comment <- paste0("CREATED USING iangow/streetevents_private/import_executive_manual_matches.R ON ", Sys.time(), ".")
-dbGetQuery(pg$con, sprintf("COMMENT ON TABLE streetevents.executive_manual_matches IS '%s';", db_comment))
+dbGetQuery(pg, sprintf("COMMENT ON TABLE streetevents.executive_manual_matches IS '%s';", db_comment))
 
 # Check no match ----
 no_match <- # 621
@@ -197,7 +200,7 @@ no_match %>% select(company_id) %>% distinct() %>% # 152
 
 no_match %>% 
     inner_join(mgt_link, by = "company_id") %>% count()
-    select(file_name, speaker_name, matches("first_name"), matches("last_name"), everything()) %>% 
+select(file_name, speaker_name, matches("first_name"), matches("last_name"), everything()) %>% 
     arrange(file_name, speaker_name, company_id) %>% 
     View()
 
