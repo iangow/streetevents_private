@@ -4,14 +4,14 @@
 
 # Load data ----
 library(dplyr)
-library(googlesheets)
+library(googlesheets4)
 library(RPostgreSQL)
 
 pg <- dbConnect(PostgreSQL())
 # gs_auth()
 dbGetQuery(pg, "DROP TABLE IF EXISTS public.executive_manual_matches")
 executive_manual_matches <- 
-    gs_read(ws = "Sheet1", gs_key("1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c")) %>% 
+    read_sheet(ss = "1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c", sheet = "Sheet1", col_types ="cccddccc") %>% 
     filter(good_match == TRUE) %>% 
     copy_to(pg, ., name = 'executive_manual_matches', temporary = FALSE)
 
@@ -20,7 +20,7 @@ executive_manual_matches <-
     compute()
 
 manual_add_exe_id <- 
-    gs_read(ws = "manual_add_executive_id", gs_key("1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c"))
+    read_sheet("1n2OgXzqFlvegHdlnvoitXGuwxbBai77_FqIyhPbua3c", sheet = "manual_add_executive_id", col_types ="ccdddcc")
 proxy_management <- tbl(pg, sql("SELECT * FROM executive.proxy_management"))
 
 manual_matches <- # file_name, speaker_name, company_id, management_id  # Need executive_id
